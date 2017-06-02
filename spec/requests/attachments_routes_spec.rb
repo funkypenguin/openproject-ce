@@ -1,5 +1,3 @@
-#-- encoding: UTF-8
-
 #-- copyright
 # OpenProject is a project management system.
 # Copyright (C) 2012-2017 the OpenProject Foundation (OPF)
@@ -28,39 +26,23 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
-module API
-  module V3
-    module Queries
-      module Columns
-        class QueryColumnRepresenter < ::API::Decorators::Single
-          self_link id_attribute: ->(*) { converted_name },
-                    title_getter: ->(*) { represented.caption }
+require 'spec_helper'
 
-          def initialize(model, *_)
-            super(model, current_user: nil, embed_links: true)
-          end
+describe 'attachments routes', type: :request do
+  let(:user) { FactoryGirl.create :admin }
+  let(:attachment) { FactoryGirl.create :attachment }
 
-          property :id,
-                   exec_context: :decorator
+  describe 'for backwards compatibility' do
+    it 'redirects /attachments/download with filename to attachments#download' do
+      get '/attachments/download/42/foo.png'
 
-          property :caption,
-                   as: :name
+      expect(response).to redirect_to('/attachments/42/foo.png')
+    end
 
-          def converted_name
-            convert_attribute(represented.name)
-          end
+    it 'redirects /attachments/download without filename to attachments#download' do
+      get '/attachments/download/42'
 
-          alias :id :converted_name
-
-          def _type
-            'QueryColumn'
-          end
-
-          def convert_attribute(attribute)
-            ::API::Utilities::PropertyNameConverter.from_ar_name(attribute)
-          end
-        end
-      end
+      expect(response).to redirect_to('/attachments/42')
     end
   end
 end

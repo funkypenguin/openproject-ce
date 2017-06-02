@@ -197,7 +197,7 @@ group :test do
   gem 'fuubar', '~> 2.2.0'
   gem 'capybara-select2', git: 'https://github.com/goodwill/capybara-select2', ref: '585192e'
   gem 'capybara-ng', '~> 0.2.7'
-  gem 'selenium-webdriver', '~> 2.53.4'
+  gem 'selenium-webdriver', '~> 3.4'
   gem 'timecop', '~> 0.8.1'
   gem 'webmock', '~> 3.0.0', require: false
 
@@ -230,15 +230,15 @@ group :development, :test do
   gem 'pry-rescue', '~> 1.4.5'
   gem 'pry-byebug', '~> 3.4.2', platforms: [:mri]
   gem 'pry-doc', '~> 0.10'
-
 end
 
 # API gems
 gem 'grape', '~> 0.19.2'
 gem 'grape-cache_control', '~> 1.0.1'
 
-gem 'roar',   '~> 1.0.0'
-gem 'reform', '~> 1.2.6', require: false
+gem 'reform', '~> 2.2.0'
+gem 'reform-rails', '~> 0.1.7'
+gem 'roar', '~> 1.1.0'
 
 platforms :mri, :mingw, :x64_mingw do
   group :mysql2 do
