@@ -1,3 +1,4 @@
+#-- encoding: UTF-8
 #-- copyright
 # OpenProject is a project management system.
 # Copyright (C) 2012-2017 the OpenProject Foundation (OPF)
@@ -26,37 +27,11 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
-require 'spec_helper'
-require_relative 'shared_query_column_specs'
+module Query::Timelines
+  extend ActiveSupport::Concern
 
-describe ::QueryCustomFieldColumn, type: :model do
-  let(:custom_field) {
-    mock_model(CustomField, field_format: 'string',
-                            order_statements: nil)
-  }
-  let(:instance) { described_class.new(custom_field) }
-
-  it_behaves_like 'query column'
-
-  describe '#available?' do
-    context 'for text custom fields' do
-      let(:custom_field) {
-        mock_model(CustomField, field_format: 'text',
-                                order_statements: nil)
-      }
-
-      it 'is false for long text custom fields' do
-        expect(instance.available?).to be_falsey
-      end
-    end
-  end
-
-  describe '#value' do
-    let(:mock) { double(WorkPackage) }
-
-    it 'delegates to typed_custom_value_for' do
-      expect(mock).to receive(:typed_custom_value_for).with(custom_field.id)
-      instance.value(mock)
-    end
+  included do
+    enum timeline_zoom_level: %i(days weeks months quarters years)
+    validates :timeline_zoom_level, inclusion: { in: timeline_zoom_levels.keys }
   end
 end
