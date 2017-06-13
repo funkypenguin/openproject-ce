@@ -28,30 +28,22 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
-class Queries::WorkPackages::Columns::RelationColumn < Queries::WorkPackages::Columns::WorkPackageColumn
-  attr_accessor :type
+class Queries::Versions::Orders::NameOrder < Queries::BaseOrder
+  self.model = Version
 
-  def initialize(type)
-    super
-
-    set_name! type
-    self.type = type
+  def self.key
+    :name
   end
 
-  def set_name!(type)
-    self.name = "relations_to_type_#{type.id}".to_sym
-  end
+  private
 
-  def caption
-    I18n.t(:'activerecord.attributes.query.relations_to_type_column',
-           type: type.name)
-  end
+  def order
+    ordered = Version.order_by_name
 
-  def self.instances(context = nil)
-    if context
-      context.types
-    else
-      Type.all
-    end.map { |type| new(type) }
+    if direction == :desc
+      ordered = ordered.reverse_order
+    end
+
+    ordered
   end
 end

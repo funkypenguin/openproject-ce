@@ -28,19 +28,29 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
-module Queries::Filters::Strategies
-  class HugeList < List
-    delegate :allowed_values_subset,
-             to: :filter
+class Queries::WorkPackages::Columns::RelationOfTypeColumn < Queries::WorkPackages::Columns::WorkPackageColumn
+  attr_accessor :type
 
-    def validate
-      if (allowed_values_subset & values).sort != values.sort
-        errors.add(:values, :inclusion)
-      end
-    end
+  def initialize(type)
+    super
 
-    def valid_values!
-      filter.values = allowed_values_subset
-    end
+    self.type = type
+  end
+
+  def name
+    "relations_of_type_#{type[:sym]}".to_sym
+  end
+
+  def sym
+    type[:sym]
+  end
+
+  def caption
+    I18n.t(:'activerecord.attributes.query.relations_of_type_column',
+           type: I18n.t(type[:sym_name]))
+  end
+
+  def self.instances(_context = nil)
+    Relation::TYPES.map { |_key, type| new(type) }
   end
 end

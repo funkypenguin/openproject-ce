@@ -1,5 +1,3 @@
-#-- encoding: UTF-8
-
 #-- copyright
 # OpenProject is a project management system.
 # Copyright (C) 2012-2017 the OpenProject Foundation (OPF)
@@ -28,19 +26,32 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
-module Queries::Filters::Strategies
-  class HugeList < List
-    delegate :allowed_values_subset,
-             to: :filter
+require 'spec_helper'
+require_relative 'shared_query_column_specs'
 
-    def validate
-      if (allowed_values_subset & values).sort != values.sort
-        errors.add(:values, :inclusion)
-      end
+describe Queries::WorkPackages::Columns::RelationOfTypeColumn, type: :model do
+  let(:project) { FactoryGirl.build_stubbed(:project) }
+  let(:type) { FactoryGirl.build_stubbed(:type) }
+  let(:instance) { described_class.new(type) }
+
+  it_behaves_like 'query column'
+
+  describe 'instances' do
+    before do
+      stub_const('Relation::TYPES',
+                 relation1: { name: :label_relates_to, sym_name: :label_relates_to, order: 1, sym: :relation1 },
+                 relation2: { name: :label_duplicates, sym_name: :label_duplicated_by, order: 2, sym: :relation2 })
     end
 
-    def valid_values!
-      filter.values = allowed_values_subset
+    it 'contains the type columns' do
+      expect(described_class.instances.length)
+        .to eq 2
+
+      expect(described_class.instances[0].sym)
+        .to eq :relation1
+
+      expect(described_class.instances[1].sym)
+        .to eq :relation2
     end
   end
 end

@@ -28,11 +28,11 @@
 
 require 'spec_helper'
 
-describe ::API::V3::Queries::Columns::QueryRelationColumnRepresenter do
+describe ::API::V3::Queries::Columns::QueryRelationToTypeColumnRepresenter do
   include ::API::V3::Utilities::PathHelper
 
   let(:type) { FactoryGirl.build_stubbed(:type) }
-  let(:column) { Queries::WorkPackages::Columns::RelationColumn.new(type) }
+  let(:column) { Queries::WorkPackages::Columns::RelationToTypeColumn.new(type) }
   let(:representer) { described_class.new(column) }
 
   subject { representer.to_json }
@@ -52,9 +52,9 @@ describe ::API::V3::Queries::Columns::QueryRelationColumnRepresenter do
       end
     end
 
-    it 'has _type QueryColumn::Relation' do
+    it 'has _type QueryColumn::RelationToType' do
       is_expected
-        .to be_json_eql('QueryColumn::Relation'.to_json)
+        .to be_json_eql('QueryColumn::RelationToType'.to_json)
         .at_path('_type')
     end
 

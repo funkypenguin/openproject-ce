@@ -94,7 +94,7 @@ GIT
 
 GIT
   remote: https://github.com/opf/openproject-translations.git
-  revision: 2da7a9c9825c7bd1932733d84a8b6a309d022df2
+  revision: 6a99720856fe6dfbb8a094460e90664546579712
   branch: dev
   specs:
     openproject-translations (7.0.0)
@@ -821,7 +821,7 @@ GEM
     websocket-driver (0.6.5)
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.2)
-    will_paginate (3.1.5)
+    will_paginate (3.1.6)
     xpath (2.0.0)
       nokogiri (~> 1.3)
     yard (0.9.8)

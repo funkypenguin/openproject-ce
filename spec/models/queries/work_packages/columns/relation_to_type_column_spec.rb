@@ -29,7 +29,7 @@
 require 'spec_helper'
 require_relative 'shared_query_column_specs'
 
-describe Queries::WorkPackages::Columns::RelationColumn, type: :model do
+describe Queries::WorkPackages::Columns::RelationToTypeColumn, type: :model do
   let(:project) { FactoryGirl.build_stubbed(:project) }
   let(:type) { FactoryGirl.build_stubbed(:type) }
   let(:instance) { described_class.new(type) }

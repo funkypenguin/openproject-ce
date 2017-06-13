@@ -28,19 +28,16 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
-module Queries::Filters::Strategies
-  class HugeList < List
-    delegate :allowed_values_subset,
-             to: :filter
-
-    def validate
-      if (allowed_values_subset & values).sort != values.sort
-        errors.add(:values, :inclusion)
+module API
+  module V3
+    module Queries
+      module Columns
+        class QueryRelationOfTypeColumnRepresenter < QueryColumnRepresenter
+          def _type
+            'QueryColumn::RelationOfType'
+          end
+        end
       end
-    end
-
-    def valid_values!
-      filter.values = allowed_values_subset
     end
   end
 end

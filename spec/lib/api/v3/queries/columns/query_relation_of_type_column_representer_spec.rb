@@ -1,6 +1,3 @@
-#-- encoding: UTF-8
-
-#-- copyright
 # OpenProject is a project management system.
 # Copyright (C) 2012-2017 the OpenProject Foundation (OPF)
 #
@@ -28,19 +25,42 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
-module Queries::Filters::Strategies
-  class HugeList < List
-    delegate :allowed_values_subset,
-             to: :filter
+require 'spec_helper'
 
-    def validate
-      if (allowed_values_subset & values).sort != values.sort
-        errors.add(:values, :inclusion)
+describe ::API::V3::Queries::Columns::QueryRelationOfTypeColumnRepresenter do
+  include ::API::V3::Utilities::PathHelper
+
+  let(:type) { { name: :label_relates_to, sym_name: :label_relates_to, order: 1, sym: :relation1 } }
+  let(:column) { Queries::WorkPackages::Columns::RelationOfTypeColumn.new(type) }
+  let(:representer) { described_class.new(column) }
+
+  subject { representer.to_json }
+
+  describe 'generation' do
+    describe '_links' do
+      it_behaves_like 'has a titled link' do
+        let(:link) { 'self' }
+        let(:href) { api_v3_paths.query_column "relationsOfType#{type[:sym].to_s.camelcase}" }
+        let(:title) { "#{I18n.t(type[:name])} relations" }
       end
     end
 
-    def valid_values!
-      filter.values = allowed_values_subset
+    it 'has _type QueryColumn::RelationOfType' do
+      is_expected
+        .to be_json_eql('QueryColumn::RelationOfType'.to_json)
+        .at_path('_type')
+    end
+
+    it 'has id attribute' do
+      is_expected
+        .to be_json_eql("relationsOfType#{type[:sym].to_s.camelcase}".to_json)
+        .at_path('id')
+    end
+
+    it 'has name attribute' do
+      is_expected
+        .to be_json_eql("#{I18n.t(type[:name])} relations".to_json)
+        .at_path('name')
     end
   end
 end
