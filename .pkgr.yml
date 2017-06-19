@@ -23,6 +23,11 @@ targets:
    dependencies:
       - epel-release
       - ImageMagick
+  centos-6:		
+     build_dependencies:		
+       - ImageMagick-devel		
+     dependencies:		
+       - ImageMagick      
   sles-11:
     env:
       - EMBED_IMAGEMAGICK=true
