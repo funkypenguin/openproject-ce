@@ -26,15 +26,33 @@
 // See doc/COPYRIGHT.rdoc for more details.
 //++
 
-import {SchemaResource, SchemaAttributeObject} from './schema-resource.service';
-import {CollectionResource} from './collection-resource.service';
-import {QueryColumn} from '../../../wp-query/query-column';
-import {QuerySortByResource} from './query-sort-by-resource.service';
-import {QueryGroupByResource} from './query-group-by-resource.service';
+import {wpDirectivesModule} from '../../../../angular-modules';
+import {HalRequestService} from '../hal-request/hal-request.service';
+import {CollectionResource} from '../hal-resources/collection-resource.service';
+import {RelationResource} from '../hal-resources/relation-resource.service';
+import {buildApiV3Filter} from '../api-v3-filter-builder';
 
-export interface QuerySchemaResourceInterface extends SchemaResource {
-  columns:{ allowedValues: QueryColumn[] };
-  filtersSchemas: CollectionResource;
-  sortBy:{ allowedValues: QuerySortByResource[] };
-  groupBy:{ allowedValues: QueryGroupByResource[] };
+export class RelationsDmService {
+
+  constructor(private halRequest:HalRequestService,
+              private I18n:op.I18n) {
+
+  }
+
+  public loadInvolved(workPackageIds:string[]):ng.IPromise<RelationResource[]> {
+    let validIds = _.filter(workPackageIds, id => /\d+/.test(id));
+
+    return this.halRequest.get(
+      '/api/v3/relations',
+      {
+        filters: buildApiV3Filter('involved', '=', validIds).toJson()
+      },
+      {
+        caching: {enabled: false}
+      }).then((collection:CollectionResource) => {
+      return collection.elements;
+    });
+  }
 }
+
+wpDirectivesModule.service('relationsDm', RelationsDmService);

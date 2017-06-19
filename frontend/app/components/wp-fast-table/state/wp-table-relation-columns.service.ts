@@ -30,10 +30,6 @@ import {opServicesModule} from '../../../angular-modules';
 import {States} from '../../states.service';
 import {WorkPackageTableRelationColumns} from '../wp-table-relation-columns';
 import {WorkPackageResourceInterface} from '../../api/api-v3/hal-resources/work-package-resource.service';
-import {
-  RelationsStateValue,
-  WorkPackageRelationsService
-} from '../../wp-relations/wp-relations.service';
 import {WorkPackageTableColumnsService} from './wp-table-columns.service';
 import {TableStateStates, WorkPackageTableBaseService} from './wp-table-base.service';
 import {RelationResource} from '../../api/api-v3/hal-resources/relation-resource.service';
@@ -44,6 +40,10 @@ import {
 import {IQService} from 'angular';
 import {HalRequestService} from '../../api/api-v3/hal-request/hal-request.service';
 import {WorkPackageCacheService} from '../../work-packages/work-package-cache.service';
+import {
+  RelationsStateValue,
+  WorkPackageRelationsService
+} from '../../wp-relations/wp-relations.service';
 
 export type RelationColumnType = 'toType' | 'ofType';
 
