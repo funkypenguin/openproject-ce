@@ -59,6 +59,19 @@ module OpenProject::Backlogs
       Redmine::AccessControl.permission(:edit_project).actions << 'projects/project_done_statuses'
       Redmine::AccessControl.permission(:edit_project).actions << 'projects/rebuild_positions'
 
+      Redmine::AccessControl.permission(:add_work_packages).tap do |add|
+        add.actions << 'rb_stories/create'
+        add.actions << 'rb_tasks/create'
+        add.actions << 'rb_impediments/create'
+      end
+
+      Redmine::AccessControl.permission(:edit_work_packages).tap do |edit|
+        edit.actions << 'rb_stories/update'
+        edit.actions << 'rb_tasks/update'
+        edit.actions << 'rb_impediments/update'
+      end
+
+
       project_module :backlogs do
         # SYNTAX: permission :name_of_permission, { :controller_name => [:action1, :action2] }
 
@@ -84,21 +97,6 @@ module OpenProject::Backlogs
         # :show_sprints and :list_sprints are implicit in :view_master_backlog permission
         permission :update_sprints,                rb_sprints: [:edit, :update],
                                                    rb_wikis:   [:edit, :update]
-
-        # Story permissions
-        # :show_stories and :list_stories are implicit in :view_master_backlog permission
-        permission :create_stories,         rb_stories: :create
-        permission :update_stories,         rb_stories: :update
-
-        # Task permissions
-        # :show_tasks and :list_tasks are implicit in :view_sprints
-        permission :create_tasks,           rb_tasks: [:new, :create]
-        permission :update_tasks,           rb_tasks: [:edit, :update]
-
-        # Impediment permissions
-        # :show_impediments and :list_impediments are implicit in :view_sprints
-        permission :create_impediments,     rb_impediments: [:new, :create]
-        permission :update_impediments,     rb_impediments: [:edit, :update]
       end
 
       menu :project_menu,
@@ -128,7 +126,6 @@ module OpenProject::Backlogs
              :Project,
              :ProjectsController,
              :ProjectsHelper,
-             :Query,
              :User,
              :VersionsController,
              :Version]
@@ -136,6 +133,10 @@ module OpenProject::Backlogs
     patch_with_namespace :API, :V3, :WorkPackages, :Schema, :SpecificWorkPackageSchema
     patch_with_namespace :BasicData, :SettingSeeder
     patch_with_namespace :DemoData, :ProjectSeeder
+    patch_with_namespace :WorkPackages, :UpdateAncestorsService
+    patch_with_namespace :WorkPackages, :UpdateService
+    patch_with_namespace :WorkPackages, :SetAttributesService
+    patch_with_namespace :WorkPackages, :BaseContract
 
     extend_api_response(:v3, :work_packages, :work_package) do
       property :position,
@@ -148,33 +149,21 @@ module OpenProject::Backlogs
 
       property :remaining_time,
                exec_context: :decorator,
-               getter: -> (*) {
-                 datetime_formatter.format_duration_from_hours(represented.remaining_hours,
-                                                               allow_nil: true)
-               },
                render_nil: true,
-               if: ->(*) { represented.backlogs_enabled? }
-    end
+               if: ->(represented:, **) { represented.backlogs_enabled? }
 
-    extend_api_response(:v3, :work_packages, :work_package_payload) do
-      property :story_points,
-               render_nil: true,
-               if: ->(*) { backlogs_enabled? && type && type.passes_attribute_constraint?(:story_points) }
+      # cannot use def here as it wouldn't define the method on the representer
+      define_method :remaining_time do
+        datetime_formatter.format_duration_from_hours(represented.remaining_hours,
+                                                      allow_nil: true)
+      end
 
-      property :remaining_time,
-               exec_context: :decorator,
-               getter: ->(*) {
-                 datetime_formatter.format_duration_from_hours(represented.remaining_hours,
+      define_method :remaining_time= do |value|
+        remaining = datetime_formatter.parse_duration_to_hours(value,
+                                                               'remainingTime',
                                                                allow_nil: true)
-               },
-               setter: ->(value, *) {
-                 remaining = datetime_formatter.parse_duration_to_hours(value,
-                                                                        'remainingTime',
-                                                                        allow_nil: true)
-                 represented.remaining_hours = remaining
-               },
-               render_nil: true,
-               if: ->(*) { represented.backlogs_enabled? }
+        represented.remaining_hours = remaining
+      end
     end
 
     extend_api_response(:v3, :work_packages, :schema, :work_package_schema) do
@@ -182,7 +171,7 @@ module OpenProject::Backlogs
              type: 'Integer',
              required: false,
              writable: false,
-             show_if: -> (*) {
+             show_if: ->(*) {
                represented.project && represented.project.backlogs_enabled? &&
                  (!represented.type || represented.type.passes_attribute_constraint?(:position))
              }
@@ -190,7 +179,7 @@ module OpenProject::Backlogs
       schema :story_points,
              type: 'Integer',
              required: false,
-             show_if: -> (*) {
+             show_if: ->(*) {
                represented.project && represented.project.backlogs_enabled? &&
                  (!represented.type || represented.type.passes_attribute_constraint?(:story_points))
              }
@@ -199,14 +188,14 @@ module OpenProject::Backlogs
              type: 'Duration',
              name_source: :remaining_hours,
              required: false,
-             show_if: -> (*) { represented.project && represented.project.backlogs_enabled? }
+             show_if: ->(*) { represented.project && represented.project.backlogs_enabled? }
     end
 
     extend_api_response(:v3, :work_packages, :schema, :work_package_sums_schema) do
       schema :story_points,
              type: 'Integer',
              required: false,
-             show_if: -> (*) {
+             show_if: ->(*) {
                ::Setting.work_package_list_summable_columns.include?('story_points')
              }
 
@@ -215,7 +204,7 @@ module OpenProject::Backlogs
              name_source: :remaining_hours,
              required: false,
              writable: false,
-             show_if: -> (*) {
+             show_if: ->(*) {
                ::Setting.work_package_list_summable_columns.include?('remaining_hours')
              }
     end
@@ -223,30 +212,24 @@ module OpenProject::Backlogs
     extend_api_response(:v3, :work_packages, :work_package_sums) do
       property :story_points,
                render_nil: true,
-               if: -> (*) {
+               if: ->(*) {
                  ::Setting.work_package_list_summable_columns.include?('story_points')
                }
 
       property :remaining_time,
                render_nil: true,
                exec_context: :decorator,
-               getter: -> (*) {
+               getter: ->(*) {
                  datetime_formatter.format_duration_from_hours(represented.remaining_hours,
                                                                allow_nil: true)
                },
-               if: -> (*) {
+               if: ->(*) {
                  ::Setting.work_package_list_summable_columns.include?('remaining_hours')
                }
     end
 
     add_api_attribute on: :work_package, ar_name: :story_points
-    add_api_attribute on: :work_package, ar_name: :remaining_hours, api_name: :remaining_time do
-      if !model.new_record? &&
-         !model.leaf? &&
-         model.changed.include?('remaining_hours')
-        errors.add :error_readonly, 'remaining_hours'
-      end
-    end
+    add_api_attribute on: :work_package, ar_name: :remaining_hours, writeable: ->(*) { model.leaf? }
 
     add_api_representer_cache_key(:v3, :work_packages, :schema, :work_package_schema) do
       if represented.project.module_enabled?('backlogs')
@@ -292,6 +275,7 @@ module OpenProject::Backlogs
       ::Type.add_default_mapping(:other, :position)
 
       Queries::Register.filter Query, OpenProject::Backlogs::WorkPackageFilter
+      Queries::Register.column Query, OpenProject::Backlogs::QueryBacklogsColumn
     end
   end
 end

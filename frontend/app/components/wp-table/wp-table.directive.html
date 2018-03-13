@@ -2,8 +2,8 @@
   <div class="work-packages-tabletimeline--table-side work-package-table--container">
     <table class="keyboard-accessible-list generic-table work-package-table">
       <colgroup>
-        <col highlight-col/>
         <col highlight-col ng-repeat="column in columns track by column.href"/>
+        <col highlight-col/>
       </colgroup>
       <caption class="hidden-for-sighted">
         <span ng-bind="::text.tableSummary"></span>
@@ -21,7 +21,7 @@
             locale="column.custom_field && columns.custom_field.name_locale || locale"
             header-column="column">
         </th>
-        <th class="wp-table--details-column -short hide-when-print">
+        <th class="wp-table--context-menu-column -short hide-when-print">
           <div class="generic-table--sort-header-outer">
             <accessible-by-keyboard
               execute="openColumnsModal()"
@@ -61,6 +61,10 @@
         <tr wp-table-sums-row></tr>
       </tfoot>
     </table>
+  </div>
+
+  <div class="work-packages--tabletimeline--timeline--resizer hidden-for-mobile hide-when-print">
+    <wp-resizer element-class="'work-packages-tabletimeline--timeline-side'" resize-event="wp-resize.timeline" local-storage-key="'openProject-timelineFlexBasis'"></wp-resizer>
   </div>
 
   <div class="work-packages-tabletimeline--timeline-side">

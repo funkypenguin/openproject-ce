@@ -33,84 +33,129 @@ module API
     module Queries
       module Filters
         class QueryFilterInstanceRepresenter < ::API::Decorators::Single
+          include API::Decorators::LinkedResource
+
           def initialize(model)
             super(model, current_user: nil, embed_links: true)
           end
 
-          link :filter do
-            {
-              href: api_v3_paths.query_filter(converted_name),
-              title: name
-            }
-          end
-
-          link :operator do
-            {
-              href: api_v3_paths.query_operator(CGI.escape(represented.operator)),
-              title: operator_name
-            }
-          end
-
-          links :values do
-            next unless represented.ar_object_filter?
-
-            represented.value_objects.map do |value_object|
-              {
-                href: api_v3_paths.send(value_object.class.name.demodulize.underscore, value_object.id),
-                title: value_object.name
-              }
-            end
-          end
-
           link :schema do
-            {
-              href: api_v3_paths.query_filter_instance_schema(converted_name)
-            }
+            api_v3_paths.query_filter_instance_schema(converted_name)
           end
+
+          resource_link :filter,
+                        getter: ->(*) {
+                          {
+                            href: api_v3_paths.query_filter(converted_name),
+                            title: name
+                          }
+                        },
+                        setter: ->(**) {
+                          # nothing for now, handled in QueryRepresenter
+                        }
+
+          resource_link :operator,
+                        getter: ->(*) {
+                          hash = {
+                            href: api_v3_paths.query_operator(CGI.escape(represented.operator))
+                          }
+
+                          hash[:title] = represented.operator_class.human_name if represented.operator_class.present?
+                          hash
+                        },
+                        setter: ->(fragment:, **) {
+                          next unless fragment
+
+                          represented.operator = ::API::Utilities::ResourceLinkParser
+                                                 .parse_id fragment["href"],
+                                                           property: 'operator',
+                                                           expected_version: '3',
+                                                           expected_namespace: 'queries/operators'
+                        }
+
+          resources :values,
+                    link: ->(*) {
+                      next unless represented.ar_object_filter?
+
+                      represented.value_objects_hash.map do |value_object|
+                        value_object[:href] ||= begin
+                          api_v3_paths.send(value_object[:identifier], value_object[:id])
+                        rescue => e
+                          Rails.logger.error "Failed to get href for value_object #{value_object}: #{e}"
+                          nil
+                        end
+
+                        {
+                          href: value_object[:href],
+                          title: value_object[:name]
+                        }
+                      end
+                    },
+                    setter: ->(fragment:, **) {
+                      next unless fragment
+
+                      if represented.ar_object_filter?
+                        set_link_values(fragment)
+                      else
+                        set_property_values(fragment)
+                      end
+                    },
+                    getter: ->(*) {
+                      if represented.respond_to?(:custom_field) &&
+                         represented.custom_field.field_format == 'bool'
+                        represented.values.map do |value|
+                          if value == CustomValue::BoolStrategy::DB_VALUE_TRUE
+                            true
+                          else
+                            false
+                          end
+                        end
+                      else
+                        represented.values
+                      end
+                    },
+                    skip_render: ->(*) { represented.ar_object_filter? },
+                    embedded: false
 
           property :name,
-                   exec_context: :decorator
-
-          property :values,
-                   if: ->(*) { !represented.ar_object_filter? },
                    exec_context: :decorator,
-                   show_nil: true
-
-          private
-
-          def name
-            represented.human_name
-          end
-
-          def values
-            if represented.respond_to?(:custom_field) &&
-               represented.custom_field.field_format == 'bool'
-              represented.values.map do |value|
-                if value == CustomValue::BoolStrategy::DB_VALUE_TRUE
-                  true
-                else
-                  false
-                end
-              end
-            else
-              represented.values
-            end
-          end
+                   writeable: false
 
           def _type
             "#{converted_name.camelize}QueryFilter"
           end
 
+          def name
+            represented.human_name
+          end
+
+          def set_link_values(vals)
+            represented.values = vals.map do |value|
+              ::API::Utilities::ResourceLinkParser.parse(value["href"])[:id]
+            end
+          end
+
+          def set_property_values(vals)
+            represented.values = if represented.respond_to?(:custom_field) &&
+                                    represented.custom_field.field_format == 'bool'
+                                   vals.map do |value|
+                                     if value
+                                       CustomValue::BoolStrategy::DB_VALUE_TRUE
+                                     else
+                                       CustomValue::BoolStrategy::DB_VALUE_FALSE
+                                     end
+                                   end
+                                 else
+                                   vals
+                                 end
+          end
+
           def converted_name
-            convert_attribute(represented.name)
+            ::API::Utilities::PropertyNameConverter.from_ar_name(represented.name)
           end
 
-          def operator_name
-            represented.operator_class.human_name if represented.operator_class.present?
-          end
-
-          def convert_attribute(attribute)
-            ::API::Utilities::PropertyNameConverter.from_ar_name(attribute)
+          def query_filter_instance_links_representer(represented)
+            ::API::V3::Queries::Filters::QueryFilterInstanceLinksRepresenter.new represented, current_user: current_user
           end
         end
       end

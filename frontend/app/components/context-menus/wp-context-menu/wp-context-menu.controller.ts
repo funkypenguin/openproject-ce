@@ -34,14 +34,17 @@ import {
   WorkPackageResourceInterface
 } from "../../api/api-v3/hal-resources/work-package-resource.service";
 import {WorkPackageRelationsHierarchyService} from "../../wp-relations/wp-relations-hierarchy/wp-relations-hierarchy.service";
+import {States} from '../../states.service';
 
 function wpContextMenuController($scope:any,
                                  $rootScope:ng.IRootScopeService,
                                  $state:ng.ui.IStateService,
+                                 states:States,
                                  WorkPackageContextMenuHelper:any,
                                  WorkPackageService:any,
                                  wpRelationsHierarchyService:WorkPackageRelationsHierarchyService,
                                  contextMenu:ContextMenuService,
+                                 wpDestroyModal:any,
                                  I18n:op.I18n,
                                  $window:ng.IWindowService,
                                  wpTableSelection:WorkPackageTableSelection,
@@ -49,8 +52,10 @@ function wpContextMenuController($scope:any,
 
   $scope.I18n = I18n;
 
-  if (!wpTableSelection.isSelected($scope.row.object.id)) {
-    wpTableSelection.setSelection($scope.row);
+  const wpId = $scope.workPackageId;
+  const workPackage = states.workPackages.get(wpId).value!;
+  if (!wpTableSelection.isSelected(wpId)) {
+    wpTableSelection.setSelection(wpId, $scope.rowIndex);
   }
 
   $scope.permittedActions = WorkPackageContextMenuHelper.getPermittedActions(getSelectedWorkPackages(), PERMITTED_CONTEXT_MENU_ACTIONS);
@@ -60,9 +65,6 @@ function wpContextMenuController($scope:any,
   };
 
   $scope.triggerContextMenuAction = function (action:any, link:any) {
-    let table: WorkPackageTable;
-    let wp: WorkPackageResourceInterface;
-
     switch (action) {
       case 'delete':
         deleteSelectedWorkPackages();
@@ -72,21 +74,20 @@ function wpContextMenuController($scope:any,
         editSelectedWorkPackages(link);
         break;
 
+      case 'copy':
+        copySelectedWorkPackages(link);
+        break;
+
       case 'relation-precedes':
-        table = $scope.table;
-        wp = $scope.row.object;
-        table.timelineController.startAddRelationPredecessor(wp);
+        $scope.table.timelineController.startAddRelationPredecessor(workPackage);
         break;
 
       case 'relation-follows':
-        table = $scope.table;
-        wp = $scope.row.object;
-        table.timelineController.startAddRelationFollower(wp);
+        $scope.table.timelineController.startAddRelationFollower(workPackage);
         break;
 
       case 'relation-new-child':
-        wp = $scope.row.object;
-        wpRelationsHierarchyService.addNewChildWp(wp);
+        wpRelationsHierarchyService.addNewChildWp(workPackage);
         break;
 
       default:
@@ -105,9 +106,8 @@ function wpContextMenuController($scope:any,
   }
 
   function deleteSelectedWorkPackages() {
-    let ids = wpTableSelection.getSelectedWorkPackageIds();
-
-    WorkPackageService.performBulkDelete(ids, true);
+    var selected = getSelectedWorkPackages();
+    wpDestroyModal.activate({ workPackages: selected });
   }
 
   function editSelectedWorkPackages(link:any) {
@@ -117,24 +117,32 @@ function wpContextMenuController($scope:any,
       $window.location.href = link;
       return;
     }
+  }
+
+  function copySelectedWorkPackages(link:any) {
+    var selected = getSelectedWorkPackages();
+
+    if (selected.length > 1) {
+      $window.location.href = link;
+      return;
+    }
 
     var params = {
-      workPackageId: selected[0].id
+      copiedFromWorkPackageId: selected[0].id
     };
 
-    $state.transitionTo('work-packages.show.edit', params);
+    $state.go('work-packages.list.copy', params);
   }
 
   function getSelectedWorkPackages() {
-    let workPackagefromContext = $scope.row.object;
     let selectedWorkPackages = wpTableSelection.getSelectedWorkPackages();
 
     if (selectedWorkPackages.length === 0) {
-      return [workPackagefromContext];
+      return [workPackage];
     }
 
-    if (selectedWorkPackages.indexOf(workPackagefromContext) === -1) {
-      selectedWorkPackages.push(workPackagefromContext);
+    if (selectedWorkPackages.indexOf(workPackage) === -1) {
+      selectedWorkPackages.push(workPackage);
     }
 
     return selectedWorkPackages;

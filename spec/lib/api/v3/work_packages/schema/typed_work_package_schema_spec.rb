@@ -70,11 +70,13 @@ describe ::API::V3::WorkPackages::Schema::TypedWorkPackageSchema do
   end
 
   describe '#milestone?' do
-    it 'is the value the type has' do
+    before do
       allow(type)
         .to receive(:is_milestone?)
-        .and_return(true)
+              .and_return(true)
+    end
 
+    it 'is the value the type has' do
       is_expected.to be_milestone
 
       allow(type)
@@ -82,6 +84,10 @@ describe ::API::V3::WorkPackages::Schema::TypedWorkPackageSchema do
         .and_return(false)
 
       is_expected.not_to be_milestone
+    end
+
+    it 'has a writable date' do
+      expect(subject.writable?(:date)).to be true
     end
   end
 
@@ -95,6 +101,21 @@ describe ::API::V3::WorkPackages::Schema::TypedWorkPackageSchema do
 
     it 'is nil for a version cf' do
       expect(subject.assignable_custom_field_values(version_cf)).to be_nil
+    end
+  end
+
+  describe '#attribute_groups' do
+    it "has no side effects on type's #attribute_groups" do
+      before = [["People", ["assignee", "responsible"]],
+                ["Estimates and time", ["estimated_time", "spent_time"]],
+                ["Details", ["category", "date", "priority", "version"]],
+                ["Other", ["percentage_done"]]]
+
+      type.attribute_groups = before
+
+      subject.attribute_groups
+
+      expect(type.attribute_groups).to eql before
     end
   end
 end

@@ -25,61 +25,79 @@
 //
 // See doc/COPYRIGHT.rdoc for more details.
 // ++
-import * as moment from "moment";
+import * as moment from 'moment';
+import {InputState, MultiInputState} from 'reactivestates';
+import {TimelineZoomLevel} from '../../api/api-v3/hal-resources/query-resource.service';
 import {
-  WorkPackageResourceInterface,
-  WorkPackageResource
-} from "../../api/api-v3/hal-resources/work-package-resource.service";
+  WorkPackageResource,
+  WorkPackageResourceInterface
+} from '../../api/api-v3/hal-resources/work-package-resource.service';
+import {WorkPackageChangeset} from '../../wp-edit-form/work-package-changeset';
+import {RenderedRow} from '../../wp-fast-table/builders/primary-render-pass';
 import Moment = moment.Moment;
 
-export const timelineElementCssClass = "timeline-element";
-export const timelineGridElementCssClass = "wp-timeline--grid-element";
-export const timelineMarkerSelectionStartClass = "selection-start";
+export const timelineElementCssClass = 'timeline-element';
+export const timelineGridElementCssClass = 'wp-timeline--grid-element';
+export const timelineMarkerSelectionStartClass = 'selection-start';
 
 /**
  *
  */
 export class TimelineViewParametersSettings {
 
-  zoomLevel: ZoomLevel = ZoomLevel.DAYS;
+  zoomLevel:TimelineZoomLevel = 'days';
 
 }
 
-export enum ZoomLevel {
-  DAYS, WEEKS, MONTHS, QUARTERS, YEARS
+// Can't properly map the enum to a string aray
+export const zoomLevelOrder:TimelineZoomLevel[] = [
+  'days', 'weeks', 'months', 'quarters', 'years'
+];
+
+export function getPixelPerDayForZoomLevel(zoomLevel:TimelineZoomLevel) {
+  switch (zoomLevel) {
+    case 'days':
+      return 30;
+    case 'weeks':
+      return 15;
+    case 'months':
+      return 6;
+    case 'quarters':
+      return 2;
+    case 'years':
+      return 0.5;
+  }
 }
 
+/**
+ * Number of days to display before the earliest workpackage in view
+ */
+export const timelineLeftSpacingInDays = 3;
 
 /**
  *
  */
 export class TimelineViewParameters {
 
-  readonly now: Moment = moment({hour: 0, minute: 0, seconds: 0});
+  readonly now:Moment = moment({hour: 0, minute: 0, seconds: 0});
 
-  dateDisplayStart: Moment = moment({hour: 0, minute: 0, seconds: 0});
+  dateDisplayStart:Moment = moment({hour: 0, minute: 0, seconds: 0});
 
-  dateDisplayEnd: Moment = this.dateDisplayStart.clone().add(1, "day");
+  dateDisplayEnd:Moment = this.dateDisplayStart.clone().add(1, 'day');
 
-  settings: TimelineViewParametersSettings = new TimelineViewParametersSettings();
+  settings:TimelineViewParametersSettings = new TimelineViewParametersSettings();
 
-  activeSelectionMode: null|((wp: WorkPackageResource) => any) = null;
+  activeSelectionMode:null | ((wp:WorkPackageResource) => any) = null;
 
-  selectionModeStart: null|string = null;
+  selectionModeStart:null | string = null;
 
-  get pixelPerDay(): number {
-    switch (this.settings.zoomLevel) {
-      case ZoomLevel.DAYS:
-        return 30;
-      case ZoomLevel.WEEKS:
-        return 15;
-      case ZoomLevel.MONTHS:
-        return 6;
-      case ZoomLevel.QUARTERS:
-        return 2;
-      case ZoomLevel.YEARS:
-        return 0.5;
-    }
+  /**
+   * The visible viewport (at the time the view parameters were calculated last!!!)
+   */
+  visibleViewportAtCalculationTime:[Moment, Moment];
+
+  get pixelPerDay():number {
+    return getPixelPerDayForZoomLevel(this.settings.zoomLevel);
   }
 
   get maxWidthInPx() {
@@ -87,7 +105,7 @@ export class TimelineViewParameters {
   }
 
   get maxSteps():number {
-    return this.dateDisplayEnd.diff(this.dateDisplayStart, "days");
+    return this.dateDisplayEnd.diff(this.dateDisplayStart, 'days');
   }
 
 }
@@ -96,14 +114,15 @@ export class TimelineViewParameters {
  *
  */
 export interface RenderInfo {
-  viewParams: TimelineViewParameters;
-  workPackage: WorkPackageResourceInterface;
+  viewParams:TimelineViewParameters;
+  workPackage:WorkPackageResourceInterface;
+  changeset:WorkPackageChangeset;
 }
 
 /**
  *
  */
-export function calculatePositionValueForDayCountingPx(viewParams: TimelineViewParameters, days: number): number {
+export function calculatePositionValueForDayCountingPx(viewParams:TimelineViewParameters, days:number):number {
   const daysInPx = days * viewParams.pixelPerDay;
   return daysInPx;
 }
@@ -111,9 +130,77 @@ export function calculatePositionValueForDayCountingPx(viewParams: TimelineViewP
 /**
  *
  */
-export function calculatePositionValueForDayCount(viewParams: TimelineViewParameters, days: number): string {
+export function calculatePositionValueForDayCount(viewParams:TimelineViewParameters, days:number):string {
   const value = calculatePositionValueForDayCountingPx(viewParams, days);
-    return value + "px";
+  return value + 'px';
 }
 
+export function getTimeSlicesForHeader(vp:TimelineViewParameters,
+                                       unit:moment.unitOfTime.DurationConstructor,
+                                       startView:Moment,
+                                       endView:Moment) {
 
+  const inViewport:[Moment, Moment][] = [];
+  const rest:[Moment, Moment][] = [];
+
+  const time = startView.clone().startOf(unit);
+  const end = endView.clone().endOf(unit);
+
+  while (time.isBefore(end)) {
+    const sliceStart = moment.max(time, startView).clone();
+    const sliceEnd = moment.min(time.clone().endOf(unit), endView).clone();
+    time.add(1, unit);
+
+    const viewport = vp.visibleViewportAtCalculationTime;
+    if ((sliceStart.isSameOrAfter(viewport[0]) && sliceStart.isSameOrBefore(viewport[1]))
+      || (sliceEnd.isSameOrAfter(viewport[0]) && sliceEnd.isSameOrBefore(viewport[1]))) {
+
+      inViewport.push([sliceStart, sliceEnd]);
+    } else {
+      rest.push([sliceStart, sliceEnd]);
+    }
+  }
+
+  const firstRest:[Moment, Moment] = rest.splice(0, 1)[0];
+  const lastRest:[Moment, Moment] = rest.pop()!;
+  const inViewportAndBoundaries = _.concat(
+    [firstRest].filter(e => !_.isNil(e)),
+    inViewport,
+    [lastRest].filter(e => !_.isNil(e))
+  );
+
+  return {
+    inViewportAndBoundaries,
+    rest
+  };
+
+}
+
+export function calculateDaySpan(visibleWorkPackages:RenderedRow[],
+                                 loadedWorkPackages:MultiInputState<WorkPackageResourceInterface>):number {
+  let earliest:Moment = moment();
+  let latest:Moment = moment();
+
+  visibleWorkPackages.forEach((renderedRow) => {
+    const wpId = renderedRow.workPackageId;
+
+    if (!wpId) {
+      return;
+    }
+    const workPackageState:InputState<WorkPackageResourceInterface> = loadedWorkPackages.get(wpId);
+    const workPackage:WorkPackageResourceInterface = workPackageState.value!;
+
+    const start = workPackage.startDate ? workPackage.startDate : workPackage.date;
+    if (start && moment(start).isBefore(earliest)) {
+      earliest = moment(start);
+    }
+
+    const due = workPackage.dueDate ? workPackage.dueDate : workPackage.date;
+    if (due && moment(due).isAfter(latest)) {
+      latest = moment(due);
+    }
+  });
+
+  const daysSpan = latest.diff(earliest, 'days') + 1;
+  return daysSpan + timelineLeftSpacingInDays;
+}

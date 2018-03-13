@@ -33,6 +33,8 @@
 // NOTE: currently needed for PhantomJS to support Webpack's style-loader.
 // See: https://github.com/webpack/style-loader/issues/31
 require('phantomjs-polyfill');
+// ES6 Promise polyfill
+require('expose-loader?Promise!es6-promise');
 
 // jQuery
 require('expose-loader?jQuery!jquery');
@@ -76,6 +78,11 @@ require('moment/locale/en-gb.js');
 require('moment/locale/de.js');
 
 require('jquery.caret');
+// Text highlight for autocompleter
+require('mark.js/dist/jquery.mark.min.js');
+// Micro Text fuzzy search library
+require('fuse.js');
+
 require('at.js/jquery.atwho.min.js');
 
 

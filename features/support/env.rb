@@ -1,4 +1,5 @@
 #-- encoding: UTF-8
+
 #-- copyright
 # OpenProject is a project management system.
 # Copyright (C) 2012-2017 the OpenProject Foundation (OPF)
@@ -76,15 +77,36 @@ end
 
 Capybara.register_driver :selenium do |app|
   require 'selenium/webdriver'
+
   Selenium::WebDriver::Firefox::Binary.path = ENV['FIREFOX_BINARY_PATH'] ||
-    Selenium::WebDriver::Firefox::Binary.path
+  Selenium::WebDriver::Firefox::Binary.path
+
+  capabilities = Selenium::WebDriver::Remote::Capabilities.firefox(marionette: true)
+  capabilities["elementScrollBehavior"] = 1
 
   profile = Selenium::WebDriver::Firefox::Profile.new
-  profile['intl.accept_languages'] = 'en,en-us'
-  profile['browser.startup.homepage_override.mstone'] = 'ignore'
-  profile['startup.homepage_welcome_url.additional'] = 'about:blank'
+  profile['intl.accept_languages'] = 'en'
 
-  Capybara::Selenium::Driver.new(app, browser: :firefox, profile: profile)
+  # use native instead of synthetic events
+  # https://github.com/SeleniumHQ/selenium/wiki/DesiredCapabilities
+  profile.native_events = true
+
+  options = Selenium::WebDriver::Firefox::Options.new
+  options.profile = profile
+
+  unless ENV['OPENPROJECT_TESTING_NO_HEADLESS']
+    options.args << "--headless"
+  end
+
+  # If you need to trace the webdriver commands, un-comment this line
+  # Selenium::WebDriver.logger.level = :debug
+
+  Capybara::Selenium::Driver.new(
+    app,
+    browser: :firefox,
+    options: options,
+    desired_capabilities: capabilities
+  )
 end
 
 Capybara.javascript_driver = :selenium

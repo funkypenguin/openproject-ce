@@ -55,6 +55,11 @@ OpenProject::Application.routes.draw do
 
     match '/login', action: 'login',  as: 'signin', via: [:get, :post]
     get '/logout', action: 'logout', as: 'signout'
+
+    get '/sso', action: 'auth_source_sso_failed', as: 'sso_failure'
+
+    get '/login/:stage/failure', action: 'stage_failure', as: 'stage_failure'
+    get '/login/:stage/:secret', action: 'stage_success', as: 'stage_success'
   end
 
   namespace :api do
@@ -140,6 +145,14 @@ OpenProject::Application.routes.draw do
       as: 'custom_style_logo',
       constraints: { filename: /[^\/]*/ }
 
+  get 'custom_style/:digest/favicon/:filename' => 'custom_styles#favicon_download',
+      as: 'custom_style_favicon',
+      constraints: { filename: /[^\/]*/ }
+
+  get 'custom_style/:digest/touch-icon/:filename' => 'custom_styles#touch_icon_download',
+      as: 'custom_style_touch_icon',
+      constraints: { filename: /[^\/]*/ }
+
   resources :custom_fields, except: :show do
     member do
       match "options/:option_id",
@@ -160,10 +173,6 @@ OpenProject::Application.routes.draw do
   # REVIEW: review those wiki routes
   scope 'projects/:project_id/wiki/:id' do
     resource :wiki_menu_item, only: [:edit, :update]
-  end
-
-  scope 'projects/:project_id/query/:query_id' do
-    resources :query_menu_items, except: [:show]
   end
 
   # generic route for adding/removing watchers.
@@ -333,28 +342,29 @@ OpenProject::Application.routes.draw do
 
       get '(/revisions/:rev)/:format/*path', action: :entry,
                                              format: /raw/,
-                                             rev: /[a-z0-9\.\-_]+/
+                                             rev: /[\w0-9\.\-_]+/
 
       %w{diff annotate changes entry browse}.each do |action|
-        get "(/revisions/:rev)/#{action}(/*path)", format: false,
-                                                   action: action,
-                                                   rev: /[a-z0-9\.\-_]+/,
-                                                   as: "#{action}_revision"
+        get "(/revisions/:rev)/#{action}(/*path)",
+            format: 'html',
+            action: action,
+            constraints: { rev: /[\w0-9\.\-_]+/, path: /.*/ },
+            as: "#{action}_revision"
       end
 
-      get '/revision(/:rev)', rev: /[a-z0-9\.\-_]+/,
+      get '/revision(/:rev)', rev: /[\w0-9\.\-_]+/,
                               action: :revision,
                               as: 'show_revision'
 
       get '(/revisions/:rev)(/*path)', action: :show,
-                                       format: false,
-                                       rev: /[a-z0-9\.\-_]+/
+                                       format: 'html',
+                                       constraints: { rev: /[\w0-9\.\-_]+/, path: /.*/ },
+                                       as: 'show_revisions_path'
     end
   end
 
   resources :admin, controller: :admin, only: :index do
     collection do
-      get :projects
       get :plugins
       get :info
       post :force_user_language
@@ -370,9 +380,13 @@ OpenProject::Application.routes.draw do
     resources :enumerations
 
     delete 'design/logo' => 'custom_styles#logo_delete', as: 'custom_style_logo_delete'
+    delete 'design/favicon' => 'custom_styles#favicon_delete', as: 'custom_style_favicon_delete'
+    delete 'design/touch_icon' => 'custom_styles#touch_icon_delete', as: 'custom_style_touch_icon_delete'
     get 'design/upsale' => 'custom_styles#upsale', as: 'custom_style_upsale'
     post 'design/colors' => 'custom_styles#update_colors', as: 'update_design_colors'
     resource :custom_style, only: [:update, :show, :create], path: 'design'
+
+    resources :attribute_help_texts, only: %i(index new create edit update destroy)
 
     resources :groups do
       member do
@@ -470,6 +484,7 @@ OpenProject::Application.routes.draw do
 
     member do
       match '/edit/:tab' => 'users#edit', via: :get, as: 'tab_edit'
+      match '/change_status/:change_action' => 'users#change_status_info', via: :get, as: 'change_status_info'
       post :change_status
       post :resend_invitation
       get :deletion_info
@@ -495,6 +510,17 @@ OpenProject::Application.routes.draw do
     post :preview, on: :collection
   end
 
+  # redirect for backwards compatibility
+  scope constraints: { id: /\d+/, filename: /[^\/]*/ } do
+    get '/attachments/download/:id/:filename',
+        to: redirect("#{rails_relative_url_root}/attachments/%{id}/%{filename}"),
+        format: false
+
+    get '/attachments/download/:id',
+        to: redirect("#{rails_relative_url_root}/attachments/%{id}"),
+        format: false
+  end
+
   resources :attachments, only: [:destroy], format: false do
     member do
       scope via: :get, constraints: { id: /\d+/, filename: /[^\/]*/ } do
@@ -509,12 +535,6 @@ OpenProject::Application.routes.draw do
       get :wiki_syntax_detailed
       get :keyboard_shortcuts
     end
-  end
-
-  # redirect for backwards compatibility
-  scope constraints: { id: /\d+/, filename: /[^\/]*/ } do
-    get '/attachments/download/:id/:filename' => redirect("#{rails_relative_url_root}/attachments/%{id}/download/%{filename}"), format: false
-    get '/attachments/download/:id' => redirect("#{rails_relative_url_root}/attachments/%{id}/download"), format: false
   end
 
   scope controller: 'sys' do
@@ -539,9 +559,7 @@ OpenProject::Application.routes.draw do
     match '/my/account', action: 'account', via: [:get, :patch]
     match '/my/settings', action: 'settings', via: [:get, :patch]
     match '/my/mail_notifications', action: 'mail_notifications', via: [:get, :patch]
-    post '/my/reset_rss_key', action: 'reset_rss_key'
     post '/my/generate_rss_key', action: 'generate_rss_key'
-    post '/my/reset_api_key', action: 'reset_api_key'
     post '/my/generate_api_key', action: 'generate_api_key'
     get '/my/access_token', action: 'access_token'
   end

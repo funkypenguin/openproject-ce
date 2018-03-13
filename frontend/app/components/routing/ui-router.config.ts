@@ -26,9 +26,8 @@
 // See doc/COPYRIGHT.rdoc for more details.
 // ++
 
-import {WorkPackageEditModeStateService} from '../wp-edit/wp-edit-mode-state.service';
 import {openprojectModule} from '../../angular-modules';
-import {debugLog} from "../../helpers/debug_output";
+import {FirstRouteService} from 'app/components/routing/first-route-service';
 
 const panels = {
   get overview() {
@@ -80,9 +79,14 @@ openprojectModule
            $urlMatcherFactoryProvider:ng.ui.IUrlMatcherFactory) => {
     $urlMatcherFactoryProvider.strictMode(false);
 
+    // Prepend the baseurl to the route to avoid using a base tag
+    // For more information, see
+    // https://github.com/angular/angular.js/issues/5519
+    // https://github.com/opf/openproject/pull/5685
+    const baseUrl = (window as any).appBasePath;
     $stateProvider
       .state('work-packages', {
-        url: '/{projects}/{projectPath}/work_packages?query_id&query_props',
+        url: baseUrl + '/{projects}/{projectPath}/work_packages?query_id&query_props',
         abstract: true,
         params: {
           // value: null makes the parameter optional
@@ -99,6 +103,9 @@ openprojectModule
       .state('work-packages.new', {
         url: '/new?type&parent_id',
         templateUrl: '/components/routing/main/work-packages.new.html',
+        resolve: {
+          successState: () => 'work-packages.show'
+        },
         controller: 'WorkPackageCreateController',
         controllerAs: '$ctrl',
         reloadOnSearch: false,
@@ -111,27 +118,15 @@ openprojectModule
         controller: 'WorkPackageCopyController',
         controllerAs: '$ctrl',
         reloadOnSearch: false,
+        resolve: {
+          successState: () => 'work-packages.show'
+        },
         templateUrl: '/components/routing/main/work-packages.new.html',
         onEnter: () => {
           angular.element('body').addClass('action-show');
         },
         onExit: () => angular.element('body').removeClass('action-show')
       })
-
-      .state('work-packages.edit', {
-        url: '/{workPackageId:[0-9]+}/edit',
-        onEnter: ($state:ng.ui.IStateService,
-                  $timeout:ng.ITimeoutService,
-                  $stateParams:ng.ui.IStateParamsService,
-                  wpEditModeState:WorkPackageEditModeStateService) => {
-          wpEditModeState.start();
-          // Transitioning to a new state may cause a reported issue
-          // $timeout is a workaround: https://github.com/angular-ui/ui-router/issues/326#issuecomment-66566642
-          // I believe we should replace this with an explicit edit state
-          $timeout(() => $state.go('work-packages.list.details.overview', $stateParams, { notify: false }));
-        }
-      })
-
       .state('work-packages.show', {
         url: '/{workPackageId:[0-9]+}',
         // Redirect to 'activity' by default.
@@ -141,20 +136,6 @@ openprojectModule
         controllerAs: '$ctrl',
         onEnter: () => angular.element('body').addClass('action-show'),
         onExit: () => angular.element('body').removeClass('action-show')
-      })
-      .state('work-packages.show.edit', {
-        url: '/edit',
-        reloadOnSearch: false,
-        onEnter: ($state:ng.ui.IStateService,
-                  $timeout:ng.ITimeoutService,
-                  $stateParams:ng.ui.IStateParamsService,
-                  wpEditModeState:WorkPackageEditModeStateService) => {
-          wpEditModeState.start();
-          // Transitioning to a new state may cause a reported issue
-          // $timeout is a workaround: https://github.com/angular-ui/ui-router/issues/326#issuecomment-66566642
-          // I believe we should replace this with an explicit edit state
-          $timeout(() => $state.go('work-packages.show', $stateParams, { notify: false }));
-        }
       })
       .state('work-packages.show.activity', panels.activity)
       .state('work-packages.show.activity.details', panels.activityDetails)
@@ -175,6 +156,9 @@ openprojectModule
         controllerAs: '$ctrl',
         templateUrl: '/components/routing/wp-list/wp.list.new.html',
         reloadOnSearch: false,
+        resolve: {
+          successState: () => 'work-packages.list.details.overview'
+        },
         onEnter: () => angular.element('body').addClass('action-create'),
         onExit: () => angular.element('body').removeClass('action-create')
       })
@@ -182,6 +166,9 @@ openprojectModule
         url: '/details/{copiedFromWorkPackageId:[0-9]+}/copy',
         controller: 'WorkPackageCopyController',
         controllerAs: '$ctrl',
+        resolve: {
+          successState: () => 'work-packages.list.details'
+        },
         templateUrl: '/components/routing/wp-list/wp.list.new.html',
         reloadOnSearch: false,
         onEnter: () => angular.element('body').addClass('action-details'),
@@ -212,10 +199,12 @@ openprojectModule
 
   .run(($location:ng.ILocationService,
         $rootElement:ng.IRootElementService,
+        firstRoute:FirstRouteService,
         $timeout:ng.ITimeoutService,
         $rootScope:ng.IRootScopeService,
         $state:ng.ui.IStateService,
         $window:ng.IWindowService) => {
+
     // Our application is still a hybrid one, meaning most routes are still
     // handled by Rails. As such, we disable the default link-hijacking that
     // Angular's HTML5-mode turns on.
@@ -243,7 +232,21 @@ openprojectModule
       }
     });
 
+    // Prevent angular handling clicks on href="#" links from other libraries
+    // (especially jquery-ui and its datepicker) from routing to <base url>/#
+    angular.element('body').on('click', 'a[href="#"]', function(evt) {
+      evt.preventDefault();
+    });
+
+
     $rootScope.$on('$stateChangeStart', (event, toState, toParams) => {
+      // We need to distinguish between actions that should run on the initial page load
+      // (ie. openining a new tab in the details view should focus on the element in the table)
+      // so we need to know which route we visited initially
+      firstRoute.setIfFirst(toState, toParams);
+
+      $rootScope.$emit('notifications.clearAll');
+
       const projectIdentifier = toParams.projectPath || $rootScope['projectIdentifier'];
 
       if (!toParams.projects && projectIdentifier) {

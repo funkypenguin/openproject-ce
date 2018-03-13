@@ -166,7 +166,7 @@ describe Api::V2::PlanningElementsController, type: :controller do
                 FactoryGirl.create(:work_package, project_id: project.id),
                 FactoryGirl.create(:work_package, project_id: project.id),
                 FactoryGirl.create(:work_package, project_id: project.id)
-              ]
+              ].each(&:reload)
               get 'index',
                   params: { ids: @created_planning_elements.map(&:id).join(',') },
                   format: 'xml'
@@ -186,7 +186,7 @@ describe Api::V2::PlanningElementsController, type: :controller do
               let!(:wp_parent) { FactoryGirl.create(:work_package, project_id: project.id) }
               let!(:wp_child)  {
                 FactoryGirl.create(:work_package, project_id: project.id,
-                                                  parent_id: wp_parent.id)
+                                                  parent: wp_parent)
               }
 
               context 'with rewire_parents=false' do
@@ -265,7 +265,7 @@ describe Api::V2::PlanningElementsController, type: :controller do
           become_member_with_view_planning_element_permissions { [project_a, project_b] }
           become_non_member { [project_c] }
 
-          it 'renders only accessable work packages' do
+          it 'renders only accessible work packages' do
             get 'index',
                 params: {
                   ids: [@project_a_wps[0].id, @project_b_wps[0].id,
@@ -276,7 +276,7 @@ describe Api::V2::PlanningElementsController, type: :controller do
             expect(assigns(:planning_elements)).to match_array([@project_a_wps[0], @project_b_wps[0]])
           end
 
-          it 'renders only accessable work packages' do
+          it 'renders only accessible work packages' do
             get 'index',
                 params: { ids: [@project_c_wps[0].id, @project_c_wps[1].id].join(',') },
                 format: 'xml'
@@ -308,11 +308,11 @@ describe Api::V2::PlanningElementsController, type: :controller do
         let!(:project1) { FactoryGirl.create(:project, identifier: 'project-1') }
         let!(:project2) { FactoryGirl.create(:project, identifier: 'project-2') }
         let!(:ticket_a) { FactoryGirl.create(:work_package, project_id: project1.id) }
-        let!(:ticket_b) { FactoryGirl.create(:work_package, project_id: project1.id, parent_id: ticket_a.id) }
-        let!(:ticket_c) { FactoryGirl.create(:work_package, project_id: project1.id, parent_id: ticket_b.id) }
+        let!(:ticket_b) { FactoryGirl.create(:work_package, project_id: project1.id, parent: ticket_a) }
+        let!(:ticket_c) { FactoryGirl.create(:work_package, project_id: project1.id, parent: ticket_b) }
         let!(:ticket_d) { FactoryGirl.create(:work_package, project_id: project1.id) }
-        let!(:ticket_e) { FactoryGirl.create(:work_package, project_id: project2.id, parent_id: ticket_d.id) }
-        let!(:ticket_f) { FactoryGirl.create(:work_package, project_id: project1.id, parent_id: ticket_e.id) }
+        let!(:ticket_e) { FactoryGirl.create(:work_package, project_id: project2.id, parent: ticket_d) }
+        let!(:ticket_f) { FactoryGirl.create(:work_package, project_id: project1.id, parent: ticket_e) }
 
         become_admin { [project1, project2] }
 
@@ -511,7 +511,7 @@ describe Api::V2::PlanningElementsController, type: :controller do
                 FactoryGirl.create(:work_package, project_id: project.id),
                 FactoryGirl.create(:work_package, project_id: project.id),
                 FactoryGirl.create(:work_package, project_id: project.id)
-              ]
+              ].each(&:reload)
               @created_planning_elements = work_packages_to_structs(created_planning_elements)
 
               get 'index', params: { project_id: project.id }, format: 'xml'
@@ -581,7 +581,7 @@ describe Api::V2::PlanningElementsController, type: :controller do
                 FactoryGirl.create(:work_package, project_id: project_a.id),
                 FactoryGirl.create(:work_package, project_id: project_b.id),
                 FactoryGirl.create(:work_package, project_id: project_b.id)
-              ]
+              ].each(&:reload)
 
               @created_planning_elements = work_packages_to_structs(created_planning_elements)
 
@@ -627,7 +627,7 @@ describe Api::V2::PlanningElementsController, type: :controller do
       def expect_redirect_to
         Regexp.new(api_v2_project_planning_elements_path(project))
       end
-      let(:permission) { :edit_work_packages }
+      let(:permission) { :add_work_packages }
 
       it_should_behave_like 'a controller action which needs project permissions'
     end
@@ -820,7 +820,7 @@ describe Api::V2::PlanningElementsController, type: :controller do
       def expect_no_content
         true
       end
-      let(:permission) { :edit_work_packages }
+      let(:permission) { %i(edit_work_packages view_work_packages) }
       it_should_behave_like 'a controller action which needs project permissions'
     end
 
@@ -902,6 +902,82 @@ describe Api::V2::PlanningElementsController, type: :controller do
         expect(custom_value).not_to be_nil
         expect(custom_value.value).not_to eq('Mett')
         expect(custom_value.value).to eq('Wurst')
+      end
+    end
+
+    describe 'with list custom fields' do
+      let(:type) { ::Type.find_by(name: 'None') || FactoryGirl.create(:type_standard) }
+
+      let(:custom_field) do
+        FactoryGirl.create :list_wp_custom_field,
+                           projects: [project],
+                           types: [type],
+                           possible_values: ['foo', 'bar', 'baz']
+      end
+
+      let(:planning_element) do
+        FactoryGirl.create :work_package,
+                           type: type,
+                           project: project,
+                           custom_values: [
+                             CustomValue.new(
+                               custom_field: custom_field,
+                               value: custom_field.possible_values.first.id
+                             )
+                           ]
+      end
+
+      it 'updates the custom field value' do
+        put 'update',
+            params: {
+              project_id: project.identifier,
+              id: planning_element.id,
+              planning_element: {
+                custom_fields: [
+                  { id: custom_field.id, value: 'bar' }
+                ]
+              }
+            },
+            format: :xml
+        expect(response.response_code).to eq(204)
+
+        wp = WorkPackage.find planning_element.id
+        custom_value = wp.custom_values.find do |value|
+          value.custom_field.name == custom_field.name
+        end
+
+        expect(custom_value).not_to be_nil
+        expect(custom_value.value).not_to eq(custom_field.possible_values.first.id.to_s)
+        expect(custom_value.value).to eq(custom_field.possible_values.second.id.to_s)
+      end
+
+      it 'creates the custom field value' do
+        post 'create',
+            params: {
+              project_id: project.identifier,
+              planning_element: {
+                subject: "custom option lookup test",
+                status_id: planning_element.status.id,
+                priority_id: planning_element.priority.id,
+                author_id: planning_element.author.id,
+                type_id: planning_element.type.id,
+                custom_fields: [
+                  { id: custom_field.id, value: 'bar' }
+                ]
+              }
+            },
+            format: :xml
+
+        expect(response.response_code).to eq(303)
+
+        wp = WorkPackage.last
+        custom_value = wp.custom_values.find do |value|
+          value.custom_field.name == custom_field.name
+        end
+
+        expect(custom_value).not_to be_nil
+        expect(custom_value.value).not_to eq(custom_field.possible_values.first.id.to_s)
+        expect(custom_value.value).to eq(custom_field.possible_values.second.id.to_s)
       end
     end
 

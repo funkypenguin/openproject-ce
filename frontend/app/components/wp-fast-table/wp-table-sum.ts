@@ -27,6 +27,7 @@
 // ++
 
 import {WorkPackageTableBaseState} from "./wp-table-base";
+
 export class WorkPackageTableSum extends WorkPackageTableBaseState<boolean> {
   public current:boolean;
 

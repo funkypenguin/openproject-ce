@@ -75,15 +75,15 @@ en:
           status_name: :default_status_in_progress
           type_name: :default_type_phase
           start: 1
-          duration: 14
+          duration: 9
           relations: []
           children: []
 
         - subject: Development
           status_name: :default_status_scheduled
           type_name: :default_type_phase
-          start: 14
-          duration: 26
+          start: 11
+          duration: 19
           relations:
             - to: 'Project planning'
               type: 'follows'
@@ -91,16 +91,16 @@ en:
           - subject: Great feature
             status_name: :default_status_developed
             type_name: :default_type_feature
-            start: 14
-            duration: 11
+            start: 11
+            duration: 10
             version: Sprint 1
             relations: []
 
           - subject: Best feature
             status_name: :default_status_specified
             type_name: :default_type_feature
-            start: 25
-            duration: 8
+            start: 22
+            duration: 5
             version: Sprint 2
             relations:
               - to: 'Great feature'
@@ -109,15 +109,17 @@ en:
           - subject: Terrible bug
             status_name: :default_status_confirmed
             type_name: :default_type_bug
-            start: 30
-            duration: 3
+            start: 28
+            duration: 2
             version: Sprint 1
-            relations: []
+            relations:
+              - to: 'Best feature'
+                type: 'follows'
 
         - subject: Go-Live
           status_name: :default_status_scheduled
           type_name: :default_type_milestone
-          start: 37
+          start: 31
           duration: 1
           relations:
             - to: 'Development'

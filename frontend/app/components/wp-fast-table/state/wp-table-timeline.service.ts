@@ -26,14 +26,16 @@
 // See doc/COPYRIGHT.rdoc for more details.
 // ++
 
-import {TableStateStates, WorkPackageTableBaseService} from "./wp-table-base.service";
-import {QueryResource} from "../../api/api-v3/hal-resources/query-resource.service";
-import {opServicesModule} from "../../../angular-modules";
-import {States} from "../../states.service";
-import {WorkPackageTableTimelineState} from "./../wp-table-timeline";
-import {ZoomLevel} from "../../wp-table/timeline/wp-timeline";
+import {opServicesModule} from '../../../angular-modules';
+import {QueryResource, TimelineLabels, TimelineZoomLevel} from '../../api/api-v3/hal-resources/query-resource.service';
+import {WorkPackageResourceInterface} from '../../api/api-v3/hal-resources/work-package-resource.service';
+import {States} from '../../states.service';
+import {zoomLevelOrder} from '../../wp-table/timeline/wp-timeline';
+import {WorkPackageTableTimelineState} from './../wp-table-timeline';
+import {TableStateStates, WorkPackageQueryStateService, WorkPackageTableBaseService} from './wp-table-base.service';
 
-export class WorkPackageTableTimelineService extends WorkPackageTableBaseService {
+export class WorkPackageTableTimelineService extends WorkPackageTableBaseService implements WorkPackageQueryStateService {
+
   protected stateName = 'timelineVisible' as TableStateStates;
 
   constructor(public states:States) {
@@ -41,9 +43,25 @@ export class WorkPackageTableTimelineService extends WorkPackageTableBaseService
   }
 
   public initialize(query:QueryResource) {
-    let current = new WorkPackageTableTimelineState(query.timelineVisible, ZoomLevel.DAYS);
+    let current = new WorkPackageTableTimelineState(query);
 
     this.state.putValue(current);
+  }
+
+  public hasChanged(query:QueryResource) {
+    const visibilityChanged = this.isVisible !== query.timelineVisible;
+    const zoomLevelChanged = this.zoomLevel !== query.timelineZoomLevel;
+    const labelsChanged = !_.isEqual(this.current.labels, query.timelineLabels);
+
+    return visibilityChanged || zoomLevelChanged || labelsChanged;
+  }
+
+  public applyToQuery(query:QueryResource) {
+    query.timelineVisible = this.isVisible;
+    query.timelineZoomLevel = this.zoomLevel;
+    query.timelineLabels = this.current.labels;
+
+    return false;
   }
 
   public toggle() {
@@ -62,14 +80,63 @@ export class WorkPackageTableTimelineService extends WorkPackageTableBaseService
     return this.current.zoomLevel;
   }
 
-  public updateZoom(delta: number) {
-    let currentState = this.current;
-    currentState.zoomLevel += delta;
+  public get labels() {
+    if (_.isEmpty(this.current.labels)) {
+      return this.current.defaultLabels;
+    }
 
+    return this.current.labels;
+  }
+
+  public updateLabels(labels:TimelineLabels) {
+    let currentState = this.current;
+    currentState.labels = labels;
     this.state.putValue(currentState);
   }
 
-  private get current():WorkPackageTableTimelineState {
+  public getNormalizedLabels(workPackage:WorkPackageResourceInterface) {
+    let labels:TimelineLabels = _.clone(this.current.defaultLabels);
+
+    _.each(this.current.labels, (attribute:string, position:keyof TimelineLabels) => {
+      // Set to null to explicitly disable
+      if (attribute === '') {
+        labels[position] = null;
+      } else {
+        labels[position] = attribute;
+      }
+    });
+
+    return labels;
+  }
+
+  public setZoomLevel(level:TimelineZoomLevel) {
+    let currentState = this.current;
+    currentState.zoomLevel = level;
+    this.state.putValue(currentState);
+  }
+
+  public updateZoomWithDelta(delta:number) {
+    if (this.isAutoZoomEnabled()) {
+      this.toggleAutoZoom();
+    }
+
+    let idx = zoomLevelOrder.indexOf(this.current.zoomLevel);
+    idx += delta;
+
+    if (idx >= 0 && idx < zoomLevelOrder.length) {
+      this.setZoomLevel(zoomLevelOrder[idx]);
+    }
+  }
+
+  public toggleAutoZoom() {
+    this.states.table.timelineAutoZoom.putValue(!this.states.table.timelineAutoZoom.value);
+  }
+
+  public isAutoZoomEnabled():boolean {
+    return this.states.table.timelineAutoZoom.value!;
+  }
+
+  public get current():WorkPackageTableTimelineState {
     return this.state.value as WorkPackageTableTimelineState;
   }
 

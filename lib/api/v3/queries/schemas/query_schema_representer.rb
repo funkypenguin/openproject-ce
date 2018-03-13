@@ -1,4 +1,5 @@
 #-- encoding: UTF-8
+
 #-- copyright
 # OpenProject is a project management system.
 # Copyright (C) 2012-2017 the OpenProject Foundation (OPF)
@@ -104,6 +105,20 @@ module API
                  has_default: true,
                  visibility: false
 
+          schema :timeline_zoom_level,
+                 type: 'String',
+                 required: false,
+                 writable: true,
+                 has_default: true,
+                 visibility: false
+
+          schema :timeline_labels,
+                 type: 'QueryTimelineLabels',
+                 required: false,
+                 writable: true,
+                 has_default: true,
+                 visibility: false
+
           schema :show_hierarchies,
                  type: 'Boolean',
                  required: false,
@@ -125,7 +140,9 @@ module API
                                          has_default: true,
                                          visibility: false,
                                          values_callback: -> { represented.available_columns },
-                                         value_representer: Columns::QueryColumnRepresenter,
+                                         value_representer: ->(column) {
+                                           Columns::QueryColumnsFactory.representer(column)
+                                         },
                                          link_factory: ->(column) {
                                            converted_name = convert_attribute(column.name)
 
@@ -195,8 +212,6 @@ module API
           def self.represented_class
             Query
           end
-
-          private
 
           def convert_attribute(attribute)
             ::API::Utilities::PropertyNameConverter.from_ar_name(attribute)

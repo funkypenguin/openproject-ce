@@ -56,7 +56,11 @@ opApp
         // Disable debugInfo outside development mode
         $compileProvider.debugInfoEnabled(window.openProject.environment === 'development');
 
-        $locationProvider.html5Mode(true);
+        $locationProvider.html5Mode({
+          enabled: true,
+          requireBase: false
+        });
+
         $httpProvider.defaults.headers.common['X-CSRF-TOKEN'] = jQuery(
             'meta[name=csrf-token]').attr('content');
         $httpProvider.defaults.headers.common['X-Authentication-Scheme'] = 'Session';
@@ -107,9 +111,15 @@ opApp
         // See https://github.com/opf/rails-angular-xss for more information.
         $rootScope.DOUBLE_LEFT_CURLY_BRACE = ExpressionService.UNESCAPED_EXPRESSION;
 
-        $rootScope.showNavigation =
-            $window.sessionStorage.getItem('openproject:navigation-toggle') !==
-            'collapsed';
+        if ($window.innerWidth < 680) {
+          // On mobile sized screens navigation shall allways be callapsed when
+          // window loads.
+          $rootScope.showNavigation = false
+        } else {
+          $rootScope.showNavigation =
+              $window.sessionStorage.getItem('openproject:navigation-toggle') !==
+              'collapsed';
+        }
 
         TimezoneService.setupLocale();
         KeyboardShortcutService.activate();
@@ -150,3 +160,10 @@ requireTemplate.keys().forEach(requireTemplate);
 
 var requireComponent = require.context('./components/', true, /^((?!\.(test|spec)).)*\.(js|ts|html)$/);
 requireComponent.keys().forEach(requireComponent);
+
+
+const debugOutput = require("./helpers/debug_output");
+debugOutput.whenDebugging(function () {
+  const reactivestates = require("reactivestates");
+  reactivestates.enableReactiveStatesLogging();
+});

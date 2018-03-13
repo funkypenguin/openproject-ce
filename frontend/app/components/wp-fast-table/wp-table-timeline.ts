@@ -26,21 +26,25 @@
 // See doc/COPYRIGHT.rdoc for more details.
 // ++
 
-import {WorkPackageTableBaseState} from "./wp-table-base";
+import {WorkPackageTableBaseState} from './wp-table-base';
+import {
+  QueryResourceInterface, TimelineLabels,
+  TimelineZoomLevel
+} from '../api/api-v3/hal-resources/query-resource.service';
+
 export class WorkPackageTableTimelineState extends WorkPackageTableBaseState<boolean> {
-  constructor(public visible:boolean, public zoomLevel:number) {
+  public visible:boolean;
+  public zoomLevel:TimelineZoomLevel;
+  public labels:TimelineLabels;
+
+  constructor(query:QueryResourceInterface) {
     super();
+    this.visible = query.timelineVisible;
+    this.zoomLevel = query.timelineZoomLevel;
+    this.labels = query.timelineLabels;
   }
 
   public get current():boolean {
-    return this.isVisible;
-  }
-
-  public get extractedCompareValue():any {
-    return this.isVisible;
-  }
-
-  public get currentQueryValue () {
     return this.isVisible;
   }
 
@@ -50,5 +54,13 @@ export class WorkPackageTableTimelineState extends WorkPackageTableBaseState<boo
 
   public get isVisible() {
     return this.visible;
+  }
+
+  public get defaultLabels():TimelineLabels {
+    return {
+      left: '',
+      right: '',
+      farRight: 'subject'
+    };
   }
 }

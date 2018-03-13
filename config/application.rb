@@ -47,10 +47,10 @@ module SimpleBenchmark
 end
 
 require 'rails/all'
+require 'active_support'
+require 'active_support/dependencies'
 
-if Rails.env.production? || (Rails.env.test? && ENV['CI'])
-  ActiveSupport::Deprecation.behavior = :silence
-end
+ActiveSupport::Deprecation.silenced = Rails.env.production? && !ENV['OPENPROJECT_SHOW_DEPRECATIONS']
 
 if defined?(Bundler)
   # lib directory has to be added to the load path so that
@@ -71,7 +71,6 @@ if defined?(Bundler)
 end
 
 require File.dirname(__FILE__) + '/../lib/open_project/configuration'
-require File.dirname(__FILE__) + '/../app/middleware/params_parser_with_exclusion'
 require File.dirname(__FILE__) + '/../app/middleware/reset_current_user'
 
 module OpenProject
@@ -95,11 +94,6 @@ module OpenProject
                                       content_type != 'application/x-gzip'
                                     }
 
-    config.middleware.use ::ParamsParserWithExclusion,
-                          exclude: -> (env) {
-                            env['PATH_INFO'] =~ /\/api\/v3/
-                          }
-
     config.middleware.use Rack::Attack
     # Ensure that tempfiles are cleared after request
     # http://stackoverflow.com/questions/4590229
@@ -109,8 +103,8 @@ module OpenProject
     # Custom directories with classes and modules you want to be autoloadable.
     # config.autoload_paths += %W(#{config.root}/extras)
     config.enable_dependency_loading = true
-    config.autoload_paths << Rails.root.join('lib')
-    config.autoload_paths << Rails.root.join('lib/constraints')
+    config.autoload_paths << Rails.root.join('lib').to_s
+    config.autoload_paths << Rails.root.join('lib/constraints').to_s
 
     # Only load the plugins named here, in the order given (default is alphabetical).
     # :all can be used as a placeholder for all plugins not explicitly named.
@@ -120,8 +114,8 @@ module OpenProject
     # Run "rake -D time" for a list of tasks for finding time zone names. Default is UTC.
     # config.time_zone = 'Central Time (US & Canada)'
 
-    # The default locale is :en and all translations from config/locales/*.rb,yml are auto loaded.
-    # config.i18n.load_path += Dir[Rails.root.join('my', 'locales', '*.{rb,yml}').to_s]
+    # Add locales from crowdin translations to i18n
+    config.i18n.load_path += Dir[Rails.root.join('config', 'locales', 'crowdin', '*.{rb,yml}').to_s]
     config.i18n.default_locale = :en
 
     # Fall back to default locale

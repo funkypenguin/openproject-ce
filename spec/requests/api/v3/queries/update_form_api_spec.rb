@@ -1,4 +1,5 @@
 #-- encoding: UTF-8
+
 #-- copyright
 # OpenProject is a project management system.
 # Copyright (C) 2012-2015 the OpenProject Foundation (OPF)
@@ -35,7 +36,7 @@ describe "POST /api/v3/queries/form", type: :request do
   let(:path) { api_v3_paths.query_form(query.id) }
   let(:user) { FactoryGirl.create(:admin) }
   let(:role) { FactoryGirl.create :existing_role, permissions: permissions }
-  let(:permissions) { [:view_work_packages, :manage_public_queries] }
+  let(:permissions) { %i(view_work_packages manage_public_queries) }
 
   let!(:project) { FactoryGirl.create(:project_with_types) }
 
@@ -48,23 +49,25 @@ describe "POST /api/v3/queries/form", type: :request do
       user: user
     )
   end
+  let(:additional_setup) {}
 
   let(:parameters) { {} }
   let(:override_params) { {} }
-  let(:form) { JSON.parse response.body }
+  let(:form) { JSON.parse last_response.body }
 
   before do
     project.add_member! user, role
 
     login_as(user)
 
-    post path,
-         params: parameters.merge(override_params).to_json,
-         headers: { 'CONTENT_TYPE' => 'application/json' }
+    additional_setup
+
+    header 'CONTENT_TYPE', 'application/json'
+    post path, parameters.merge(override_params).to_json
   end
 
   it 'should return 200(OK)' do
-    expect(response.status).to eq(200)
+    expect(last_response.status).to eq(200)
   end
 
   it 'should be of type form' do
@@ -104,6 +107,199 @@ describe "POST /api/v3/queries/form", type: :request do
 
       it "has the correct method" do
         expect(form.dig("_links", "commit", "method")).to eq "patch"
+      end
+    end
+
+    describe 'columns' do
+      let(:relation_columns_allowed) { true }
+
+      let(:additional_setup) do
+        custom_field
+
+        non_project_type
+
+        # There does not seem to appear a way to generate a valid token
+        # for testing purposes
+        allow(EnterpriseToken)
+          .to receive(:allows_to?)
+          .with(:work_package_query_relation_columns)
+          .and_return(relation_columns_allowed)
+      end
+
+      let(:custom_field) do
+        cf = FactoryGirl.create(:list_wp_custom_field)
+        project.work_package_custom_fields << cf
+        cf.types << project.types.first
+
+        cf
+      end
+
+      let(:non_project_type) do
+        FactoryGirl.create(:type)
+      end
+
+      let(:static_columns_json) do
+        %w(id project assignee author
+           category createdAt dueDate estimatedTime
+           parent percentageDone priority responsible
+           spentTime startDate status subject type
+           updatedAt version).map do |id|
+          {
+            '_type': 'QueryColumn::Property',
+            'id': id
+          }
+        end
+      end
+
+      let(:custom_field_columns_json) do
+        [
+          {
+            '_type': 'QueryColumn::Property',
+            'id': "customField#{custom_field.id}"
+          }
+        ]
+      end
+
+      let(:relation_to_type_columns_json) do
+        project.types.map do |type|
+          {
+            '_type': 'QueryColumn::RelationToType',
+            'id': "relationsToType#{type.id}"
+          }
+        end
+      end
+
+      let(:relation_of_type_columns_json) do
+        Relation::TYPES.map do |_, value|
+          {
+            '_type': 'QueryColumn::RelationOfType',
+            'id': "relationsOfType#{value[:sym].camelcase}"
+          }
+        end
+      end
+
+      let(:non_project_type_relation_column_json) do
+        [
+          {
+            '_type': 'QueryColumn::RelationToType',
+            'id': "relationsToType#{non_project_type.id}"
+          }
+        ]
+      end
+
+      context 'within a project' do
+        context 'with relation columns allowed by the enterprise token' do
+          it 'has the static, custom field and relation columns' do
+            expected_columns = static_columns_json +
+                               custom_field_columns_json +
+                               relation_to_type_columns_json +
+                               relation_of_type_columns_json
+
+            actual_columns = form.dig('_embedded',
+                                      'schema',
+                                      'columns',
+                                      '_embedded',
+                                      'allowedValues')
+                                 .map do |column|
+                                   {
+                                     '_type': column['_type'],
+                                     'id': column['id']
+                                   }
+                                 end
+
+            expect(actual_columns).to include(*expected_columns)
+            expect(actual_columns).not_to include(non_project_type_relation_column_json)
+          end
+        end
+
+        context 'with relation columns disallowed by the enterprise token' do
+          it 'has the static and custom field' do
+            expected_columns = static_columns_json +
+                               custom_field_columns_json
+
+            actual_columns = form.dig('_embedded',
+                                      'schema',
+                                      'columns',
+                                      '_embedded',
+                                      'allowedValues')
+                                 .map do |column|
+                                   {
+                                     '_type': column['_type'],
+                                     'id': column['id']
+                                   }
+                                 end
+
+            expect(actual_columns).to include(*expected_columns)
+            expect(actual_columns).not_to include(non_project_type_relation_column_json)
+            expect(actual_columns).not_to include(relation_to_type_columns_json)
+            expect(actual_columns).not_to include(relation_of_type_columns_json)
+          end
+        end
+      end
+
+      context 'globally (no project)' do
+        let(:additional_setup) do
+          custom_field
+
+          non_project_type
+
+          query.update_attribute(:project, nil)
+
+          # There does not seem to appear a way to generate a valid token
+          # for testing purposes
+          allow(EnterpriseToken)
+            .to receive(:allows_to?)
+            .with(:work_package_query_relation_columns)
+            .and_return(relation_columns_allowed)
+        end
+
+        context 'with relation columns allowed by the enterprise token' do
+          it 'has the static, custom field and relation columns' do
+            expected_columns = static_columns_json +
+                               custom_field_columns_json +
+                               relation_to_type_columns_json +
+                               non_project_type_relation_column_json +
+                               relation_of_type_columns_json
+
+            actual_columns = form.dig('_embedded',
+                                      'schema',
+                                      'columns',
+                                      '_embedded',
+                                      'allowedValues')
+                                 .map do |column|
+                                   {
+                                     '_type': column['_type'],
+                                     'id': column['id']
+                                   }
+                                 end
+
+            expect(actual_columns).to include(*expected_columns)
+          end
+        end
+
+        context 'with relation columns disallowed by the enterprise token' do
+          it 'has the static, custom field and relation columns' do
+            expected_columns = static_columns_json +
+                               custom_field_columns_json
+
+            actual_columns = form.dig('_embedded',
+                                      'schema',
+                                      'columns',
+                                      '_embedded',
+                                      'allowedValues')
+                                 .map do |column|
+                                   {
+                                     '_type': column['_type'],
+                                     'id': column['id']
+                                   }
+                                 end
+
+            expect(actual_columns).to include(*expected_columns)
+            expect(actual_columns).not_to include(non_project_type_relation_column_json)
+            expect(actual_columns).not_to include(relation_to_type_columns_json)
+            expect(actual_columns).not_to include(relation_of_type_columns_json)
+          end
+        end
       end
     end
   end
@@ -175,7 +371,7 @@ describe "POST /api/v3/queries/form", type: :request do
     end
 
     it 'has the project set' do
-      project_link = { "href" => "/api/v3/projects/#{project.id}" }
+      project_link = { "href" => "/api/v3/projects/#{project.id}", 'title' => project.name }
 
       expect(form.dig("_embedded", "payload", "_links", "project")).to eq project_link
     end
@@ -188,10 +384,19 @@ describe "POST /api/v3/queries/form", type: :request do
       filters = [
         {
           "_links" => {
-            "filter" => { "href" => "/api/v3/queries/filters/status" },
-            "operator" => { "href" => "/api/v3/queries/operators/%3D" },
+            "filter" => {
+              "href" => "/api/v3/queries/filters/status",
+              'title' => 'Status'
+            },
+            "operator" => {
+              "href" => "/api/v3/queries/operators/%3D",
+              "title" => 'is'
+            },
             "values" => [
-              { "href" => "/api/v3/statuses/#{status.id}" }
+              {
+                "href" => "/api/v3/statuses/#{status.id}",
+                "title" => status.name
+              }
             ]
           }
         }
@@ -202,23 +407,23 @@ describe "POST /api/v3/queries/form", type: :request do
 
     it 'has the columns set' do
       columns = [
-        { "href" => "/api/v3/queries/columns/id" },
-        { "href" => "/api/v3/queries/columns/subject" }
+        { "href" => "/api/v3/queries/columns/id", 'title' => 'ID' },
+        { "href" => "/api/v3/queries/columns/subject", 'title' => 'Subject' }
       ]
 
       expect(form.dig("_embedded", "payload", "_links", "columns")).to eq columns
     end
 
     it 'has the groupBy set' do
-      group_by = { "href" => "/api/v3/queries/group_bys/assignee" }
+      group_by = { "href" => "/api/v3/queries/group_bys/assignee", 'title' => 'Assignee' }
 
       expect(form.dig("_embedded", "payload", "_links", "groupBy")).to eq group_by
     end
 
     it 'has the columns set' do
       sort_by = [
-        { "href" => "/api/v3/queries/sort_bys/id-desc" },
-        { "href" => "/api/v3/queries/sort_bys/assignee-asc" }
+        { "href" => "/api/v3/queries/sort_bys/id-desc", 'title' => 'ID (Descending)' },
+        { "href" => "/api/v3/queries/sort_bys/assignee-asc", 'title' => 'Assignee (Ascending)' }
       ]
 
       expect(form.dig("_embedded", "payload", "_links", "sortBy")).to eq sort_by
@@ -236,7 +441,7 @@ describe "POST /api/v3/queries/form", type: :request do
       end
 
       it "still finds the project" do
-        project_link = { "href" => "/api/v3/projects/#{project.id}" }
+        project_link = { "href" => "/api/v3/projects/#{project.id}", 'title' => project.name }
 
         expect(form.dig("_embedded", "payload", "_links", "project")).to eq project_link
       end
@@ -271,7 +476,7 @@ describe "POST /api/v3/queries/form", type: :request do
       end
 
       it "returns a validation error" do
-        expect(form.dig("_embedded", "validationErrors", "columnNames", "message"))
+        expect(form.dig("_embedded", "validationErrors", "columns", "message"))
           .to eq "Invalid query column: wurst"
       end
     end
@@ -303,7 +508,7 @@ describe "POST /api/v3/queries/form", type: :request do
       end
 
       it "returns a validation error" do
-        expect(form.dig("_embedded", "validationErrors", "sortCriteria", "message"))
+        expect(form.dig("_embedded", "validationErrors", "sortBy", "message"))
           .to eq "Can't sort by column: spent_hours"
       end
     end

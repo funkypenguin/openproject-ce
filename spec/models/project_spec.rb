@@ -50,12 +50,12 @@ describe Project, type: :model do
     end
 
     it 'is active when :status equals STATUS_ACTIVE' do
-      project = FactoryGirl.create :project, status: 42
+      project = FactoryGirl.build :project, status: 42
       expect(project).to be_active
     end
 
     it "is not active when :status doesn't equal STATUS_ACTIVE" do
-      project = FactoryGirl.create :project, status: 99
+      project = FactoryGirl.build :project, status: 99
       expect(project).not_to be_active
     end
   end
@@ -179,7 +179,8 @@ describe Project, type: :model do
     let(:type) { project.types.first }
     let(:other_type) { project.types.second }
     let(:project_work_package) { FactoryGirl.create(:work_package, type: type, project: project) }
-    let(:other_project_work_package) { FactoryGirl.create(:work_package, type: other_type) }
+    let(:other_project) { FactoryGirl.create(:project, no_types: true, types: [other_type, type]) }
+    let(:other_project_work_package) { FactoryGirl.create(:work_package, type: other_type, project: other_project) }
 
     it 'returns the type used by a work package of the project' do
       project_work_package

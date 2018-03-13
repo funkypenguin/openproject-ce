@@ -42,6 +42,8 @@ class ApplicationController < ActionController::Base
   include I18n
   include Redmine::I18n
   include HookHelper
+  include ::OpenProject::Authentication::SessionExpiry
+  include AdditionalUrlHelpers
 
   layout 'base'
 
@@ -104,7 +106,7 @@ class ApplicationController < ActionController::Base
   end
 
   rescue_from ActionController::ParameterMissing do |exception|
-    render text:   "Required parameter missing: #{exception.param}",
+    render body:   "Required parameter missing: #{exception.param}",
            status: :bad_request
   end
 
@@ -442,7 +444,7 @@ class ApplicationController < ActionController::Base
       params[:back_url],
       hostname: request.host,
       default: default,
-      return_escaped: use_escaped,
+      return_escaped: use_escaped
     )
 
     redirect_to policy.redirect_url
@@ -675,13 +677,7 @@ class ApplicationController < ActionController::Base
   private
 
   def session_expired?
-    !api_request? && current_user.logged? &&
-      (session_ttl_enabled? && (session[:updated_at].nil? ||
-                               (session[:updated_at] + Setting.session_ttl.to_i.minutes) < Time.now))
-  end
-
-  def session_ttl_enabled?
-    Setting.session_ttl_enabled? && Setting.session_ttl.to_i >= 5
+    !api_request? && current_user.logged? && session_ttl_expired?
   end
 
   def permitted_params
@@ -714,4 +710,6 @@ class ApplicationController < ActionController::Base
   # callbacks when the core application controller is fully loaded. Good explanation of load hooks:
   # http://simonecarletti.com/blog/2011/04/understanding-ruby-and-rails-lazy-load-hooks/
   ActiveSupport.run_load_hooks(:application_controller, self)
+
+  prepend Concerns::AuthSourceSSO
 end

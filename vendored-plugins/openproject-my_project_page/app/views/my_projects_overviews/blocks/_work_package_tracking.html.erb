@@ -39,16 +39,9 @@ See doc/COPYRIGHT.md for more details.
       <% end %>
     </ul>
     <p>
-      <%= link_to l(:label_work_package_view_all), {:controller => '/work_packages', :action => 'index', :project_id => project}, :class => 'button -highlight' %>
+      <%= link_to l(:label_work_package_view_all), {:controller => '/work_packages', :action => 'index', :project_id => project}, :class => 'button -highlight-inverted' %>
       <% if User.current.allowed_to?(:view_gantt, project, :global => true) %>
         <%= link_to(l(:label_gantt), {:controller => '/gantts', :action => 'show', :project_id => project}, :class => 'button -highlight') %>
-      <% end %>
-      <%= link_to new_project_work_packages_path(project),
-            { class: 'button -alt-highlight',
-              title: t(:label_keyboard_shortcut_new_work_package),
-              aria: { label: t(:label_keyboard_shortcut_new_work_package) }} do %>
-        <%= op_icon('button--icon icon-add') %>
-        <span class="button--text"><%= l('activerecord.models.work_package') %></span>
       <% end %>
     </p>
   </div>

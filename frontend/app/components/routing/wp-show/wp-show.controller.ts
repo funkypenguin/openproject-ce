@@ -33,6 +33,7 @@ import {WorkPackageResourceInterface} from "../../api/api-v3/hal-resources/work-
 import {WorkPackageViewController} from "../wp-view-base/wp-view-base.controller";
 import {WorkPackagesListChecksumService} from "../../wp-list/wp-list-checksum.service";
 import {WorkPackageMoreMenuService} from '../../work-packages/work-package-more-menu.service'
+import {WorkPackageTableFocusService} from "core-components/wp-fast-table/state/wp-table-focus.service";
 
 export class WorkPackageShowController extends WorkPackageViewController {
 
@@ -50,16 +51,19 @@ export class WorkPackageShowController extends WorkPackageViewController {
 
   private wpMoreMenu:WorkPackageMoreMenuService;
 
-  constructor(public $injector:ng.auto.IInjectorService,
-              public $scope:ng.IScope,
+  constructor(public $scope:ng.IScope,
               public $state:ng.ui.IStateService,
+              public wpTableFocus:WorkPackageTableFocusService,
               protected wpMoreMenuService:WorkPackageMoreMenuService) {
-    super($injector, $scope, $state.params['workPackageId']);
+    super($scope, $state.params['workPackageId']);
     this.observeWorkPackage();
   }
 
   protected init() {
     super.init();
+
+    // Set Focused WP
+    this.wpTableFocus.updateFocus(this.workPackage.id);
 
     // initialization
     this.wpMoreMenu = new (this.wpMoreMenuService as any)(this.workPackage);

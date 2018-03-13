@@ -26,14 +26,17 @@
 // See doc/COPYRIGHT.rdoc for more details.
 // ++
 
-import {WorkPackageTableBaseState} from "./wp-table-base";
+import {WorkPackageTableBaseState} from './wp-table-base';
+
 export class WorkPackageTableHierarchies extends WorkPackageTableBaseState<boolean> {
   public current:boolean;
+  public last:string|null;
   public collapsed:{[workPackageId:string]:boolean};
 
   constructor(isVisible:boolean) {
     super();
     this.current = isVisible;
+    this.last = null;
     this.collapsed = {};
   }
 

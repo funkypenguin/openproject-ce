@@ -34,7 +34,7 @@ describe ::API::V3::Relations::RelationRepresenter do
   let(:from) { FactoryGirl.create :work_package }
   let(:to) { FactoryGirl.create :work_package }
 
-  let(:type) { "precedes" }
+  let(:type) { "follows" }
   let(:description) { "This first" }
   let(:delay) { 3 }
 
@@ -72,12 +72,12 @@ describe ::API::V3::Relations::RelationRepresenter do
         "to" => {
           "href" => "/api/v3/work_packages/#{to.id}",
           "title" => to.subject
-        }
+        },
       },
       "id" => relation.id,
-      "name" => "precedes",
-      "type" => "precedes",
-      "reverseType" => "follows",
+      "name" => "follows",
+      "type" => "follows",
+      "reverseType" => "precedes",
       "description" => description,
       "delay" => delay
     }

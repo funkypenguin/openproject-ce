@@ -28,6 +28,8 @@
 
 import {WorkPackageResource} from '../api/api-v3/hal-resources/work-package-resource.service';
 import {States} from '../states.service';
+import {$injectFields} from '../angular/angular-injector-bridge.functions';
+import {PathHelperFunctions} from 'core-components/common/path-helper/path-helper.functions';
 
 var $state:ng.ui.IStateService;
 var $window:ng.IWindowService;
@@ -41,17 +43,14 @@ var PERMITTED_MORE_MENU_ACTIONS:any;
 
 export class WorkPackageMoreMenuService {
   public permittedActions:any;
+  public wpDestroyModal:any;
 
-  constructor(private workPackage:WorkPackageResource) {}
+  constructor(private workPackage:WorkPackageResource) {
+    $injectFields(this, 'wpDestroyModal');
+  }
 
   public deleteSelectedWorkPackage() {
-    var promise = WorkPackageService.performBulkDelete([this.workPackage.id], true);
-
-    promise.then(() => {
-      states.focusedWorkPackage.clear();
-
-      $state.go('work-packages.list');
-    });
+    this.wpDestroyModal.activate({ workPackages: [this.workPackage] });
   }
 
   public triggerMoreMenuAction(action:string, link:string) {
@@ -60,8 +59,9 @@ export class WorkPackageMoreMenuService {
         this.deleteSelectedWorkPackage();
         break;
       default:
-        if (this.isLinkToAnguluar(link)) {
-          $location.path(link);
+        const normalized = PathHelperFunctions.removeBasePathFromLink(link);
+        if (this.isLinkToAnguluar(normalized)) {
+          $location.path(normalized);
         } else {
           $window.location.href = link;
         }

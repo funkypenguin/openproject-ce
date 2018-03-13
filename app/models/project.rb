@@ -84,29 +84,33 @@ class Project < ActiveRecord::Base
       .references(:principals, :roles)
   }, class_name: 'Member'
   # Read only
-  has_many :possible_responsibles, -> (object){
-    # Have to reference members and roles again although
-    # possible_responsible_members does already specify it to be able to use
-    # the Project.possible_principles_condition there
-    #
-    # The .where(members_users: { project_id: object.id })
-    # part is an optimization preventing to have all the members joined
-    includes(members: :roles)
-      .where(members_users: { project_id: object.id })
-      .references(:roles)
-      .merge(Principal.order_by_name)
-  },
-  through: :possible_responsible_members,
-  source: :principal
+  has_many :possible_responsibles,
+           ->(object) {
+             # Have to reference members and roles again although
+             # possible_responsible_members does already specify it to be able to use
+             # the Project.possible_principles_condition there
+             #
+             # The .where(members_users: { project_id: object.id })
+             # part is an optimization preventing to have all the members joined
+             includes(members: :roles)
+               .where(members_users: { project_id: object.id })
+               .references(:roles)
+               .merge(Principal.order_by_name)
+           },
+           through: :possible_responsible_members,
+           source: :principal
   has_many :memberships, class_name: 'Member'
-  has_many :member_principals, -> {
-    includes(:principal)
-      .where("#{Principal.table_name}.type='Group' OR " +
-      "(#{Principal.table_name}.type='User' AND " +
-      "(#{Principal.table_name}.status=#{Principal::STATUSES[:active]} OR " +
-      "#{Principal.table_name}.status=#{Principal::STATUSES[:registered]} OR " +
-      "#{Principal.table_name}.status=#{Principal::STATUSES[:invited]}))")
-  }, class_name: 'Member'
+  has_many :member_principals,
+           -> {
+             includes(:principal)
+               .references(:principals)
+               .where("#{Principal.table_name}.type='Group' OR " +
+               "(#{Principal.table_name}.type='User' AND " +
+               "(#{Principal.table_name}.status=#{Principal::STATUSES[:active]} OR " +
+               "#{Principal.table_name}.status=#{Principal::STATUSES[:registered]} OR " +
+               "#{Principal.table_name}.status=#{Principal::STATUSES[:invited]}))")
+           },
+           class_name: 'Member'
   has_many :users, through: :members
   has_many :principals, through: :member_principals, source: :principal
 
@@ -333,12 +337,18 @@ class Project < ActiveRecord::Base
     Authorization.projects(permission, user)
   end
 
+  def reload(*args)
+    @all_work_package_custom_fields = nil
+
+    super
+  end
+
   # Returns the Systemwide and project specific activities
   def activities(include_inactive = false)
     if include_inactive
-      return all_activities
+      all_activities
     else
-      return active_activities
+      active_activities
     end
   end
 
@@ -488,7 +498,7 @@ class Project < ActiveRecord::Base
   def types_used_by_work_packages
     ::Type.where(id: WorkPackage.where(project_id: project.id)
                                 .select(:type_id)
-                                .uniq)
+                                .distinct)
   end
 
   # Returns an array of the types used by the project and its active sub projects
@@ -546,7 +556,7 @@ class Project < ActiveRecord::Base
   # reduce the number of db queries when performing operations including the
   # project's versions.
   def assignable_versions
-    @all_shared_versions ||= shared_versions.open.to_a
+    @all_shared_versions ||= shared_versions.with_status_open.to_a
   end
 
   # Returns a hash of project users grouped by role
@@ -632,14 +642,6 @@ class Project < ActiveRecord::Base
     end
 
     description.gsub(/\A(.{#{length}}[^\n\r]*).*\z/m, '\1...').strip
-  end
-
-  def css_classes
-    s = 'project'
-    s << ' root' if root?
-    s << ' child' if child?
-    s << (leaf? ? ' leaf' : ' parent')
-    s
   end
 
   # The earliest start date of a project, based on it's issues and versions

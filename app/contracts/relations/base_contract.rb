@@ -1,4 +1,5 @@
 #-- encoding: UTF-8
+
 #-- copyright
 # OpenProject is a project management system.
 # Copyright (C) 2012-2017 the OpenProject Foundation (OPF)
@@ -32,17 +33,21 @@ require 'model_contract'
 module Relations
   class BaseContract < ::ModelContract
     attribute :relation_type
-
     attribute :delay
     attribute :description
+    attribute :from
+    attribute :to
 
-    attribute :from_id
-    attribute :to_id
-
-    validate :user_allowed_to_access
-    validate :user_allowed_to_manage_relations
+    validate :manage_relations_permission?
+    validate :validate_from_exists
+    validate :validate_to_exists
+    validate :validate_only_one_follow_direction_between_hierarchies
 
     attr_reader :user
+
+    def self.model
+      Relation
+    end
 
     def initialize(relation, user)
       super relation
@@ -50,37 +55,31 @@ module Relations
       @user = user
     end
 
+    def validate!(*args)
+      # same as before_validation callback
+      model.send(:reverse_if_needed)
+      super
+    end
+
     private
 
-    def fields
-      override_delay! super
-    end
-
-    ##
-    # We have to redefine `#delay` in this `Reform::Contract::Fields` instance
-    # because it's conflicting with delayed_job's `#delay`. Without this a call
-    # to `fields.delay.nil?` will actually enqueue the call to `#nil?` as a delayed job
-    # as opposed to just checking the field for nil.
-    #
-    # This is the best I could come up with. Feel free to solve this better if you know how!
-    def override_delay!(fields)
-      @delay_overriden ||= begin
-        def fields.delay
-          @table[:delay]
-        end
-      end
-
-      fields
-    end
-
-    ##
-    # Allow the user only to create/update relations between work packages they are allowed to see.
-    def user_allowed_to_access
+    def validate_from_exists
       errors.add :from, :error_not_found unless visible_work_packages.exists? model.from_id
+    end
+
+    def validate_to_exists
       errors.add :to, :error_not_found unless visible_work_packages.exists? model.to_id
     end
 
-    def user_allowed_to_manage_relations
+    def validate_only_one_follow_direction_between_hierarchies
+      return unless [Relation::TYPE_HIERARCHY, Relation::TYPE_FOLLOWS].include? model.relation_type
+
+      if follow_relations_in_opposite_direction.exists?
+        errors.add :base, I18n.t(:'activerecord.errors.messages.circular_dependency')
+      end
+    end
+
+    def manage_relations_permission?
       if !manage_relations?
         errors.add :base, :error_unauthorized
       end
@@ -92,6 +91,67 @@ module Relations
 
     def manage_relations?
       user.allowed_to? :manage_work_package_relations, model.from.project
+    end
+
+    # Go up to's hierarchy to the highest ancestor not shared with from.
+    # Fetch all endpoints of relations that are reachable by following at least one follows
+    # and zero or more hierarchy relations.
+    # We now need to check whether those endpoints include any that
+    #
+    # * are an ancestor of from
+    # * are a descendant of from
+    # * are from itself
+    #
+    # Siblings and sibling subtrees of ancestors are ok to have relations
+    def follow_relations_in_opposite_direction
+      to_set = hierarchy_or_follows_of
+
+      follows_relations_to_ancestors(to_set)
+        .or(follows_relations_to_descendants(to_set))
+        .or(follows_relations_to_from(to_set))
+    end
+
+    def hierarchy_or_follows_of
+      to_root_ancestor = tos_highest_ancestor_not_shared_by_from
+
+      Relation
+        .hierarchy_or_follows
+        .where(from_id: to_root_ancestor)
+        .where('follows > 0')
+    end
+
+    def tos_highest_ancestor_not_shared_by_from
+      # mysql does not support a limit inside a subquery.
+      # we thus join/subselect the query for ancestors of to not shared by from
+      # with itself and exclude all that have a hierarchy value smaller than hierarchy - 1
+      unshared_ancestors = tos_ancestors_not_shared_by_from
+
+      unshared_ancestors
+        .where.not(hierarchy: unshared_ancestors.select('hierarchy - 1'))
+        .select(:from_id)
+    end
+
+    def tos_ancestors_not_shared_by_from
+      Relation
+        .hierarchy_or_reflexive
+        .where(to_id: model.to_id)
+        .where.not(from_id: Relation.hierarchy_or_reflexive
+                              .where(to_id: model.from_id)
+                              .select(:from_id))
+    end
+
+    def follows_relations_to_ancestors(to_set)
+      ancestors = Relation.hierarchy.where(to_id: model.from)
+      to_set.where(to_id: ancestors.select(:from_id))
+    end
+
+    def follows_relations_to_descendants(to_set)
+      descendants = Relation.hierarchy.where(from_id: model.from)
+      to_set.where(to_id: descendants.select(:to_id))
+    end
+
+    def follows_relations_to_from(to_set)
+      to_set.where(to_id: model.from_id)
     end
   end
 end

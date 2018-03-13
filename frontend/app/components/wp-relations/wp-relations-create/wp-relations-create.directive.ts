@@ -1,10 +1,10 @@
 import {wpDirectivesModule} from '../../../angular-modules';
-import {WorkPackageResourceInterface} from '../../api/api-v3/hal-resources/work-package-resource.service';
-import {WorkPackageRelationsService} from '../wp-relations.service';
-import {WorkPackageRelationsHierarchyService} from '../wp-relations-hierarchy/wp-relations-hierarchy.service';
-import {WorkPackageNotificationService} from '../../wp-edit/wp-notification.service';
-import {WorkPackageCacheService} from '../../work-packages/work-package-cache.service';
 import {RelationResource} from '../../api/api-v3/hal-resources/relation-resource.service';
+import {WorkPackageResourceInterface} from '../../api/api-v3/hal-resources/work-package-resource.service';
+import {WorkPackageCacheService} from '../../work-packages/work-package-cache.service';
+import {WorkPackageNotificationService} from '../../wp-edit/wp-notification.service';
+import {WorkPackageRelationsHierarchyService} from '../wp-relations-hierarchy/wp-relations-hierarchy.service';
+import {WorkPackageRelationsService} from '../wp-relations.service';
 
 export class WorkPackageRelationsCreateController {
 
@@ -14,7 +14,7 @@ export class WorkPackageRelationsCreateController {
   public selectedWpId:string;
   public externalFormToggle: boolean;
   public fixedRelationType:string;
-  public relationTypes = this.wpRelations.getRelationTypes(true);
+  public relationTypes = RelationResource.LOCALIZED_RELATION_TYPES(false);
 
   public canAddChildren = !!this.workPackage.addChild;
   public canLinkChildren = !!this.workPackage.changeParent;
@@ -118,7 +118,7 @@ export class WorkPackageRelationsCreateController {
   }
 }
 
-function wpRelationsCreate() {
+function wpRelationsCreate():any {
   return {
     restrict: 'E',
 

@@ -232,6 +232,9 @@ $form--field-types: (text-field, text-area, select, check-box, radio-button, ran
   padding:        1rem 0 0
   margin-bottom:  1rem
   border:         0
+  // Flexbox needs that parents of children with overflow set to have a width:
+  min-width: 0
+
 
 %form--fieldset-legend-or-section-title
   color:          lighten($body-font-color, 10)
@@ -448,6 +451,7 @@ fieldset.form--fieldset
 .form--field-instructions
   @extend %form--field-after-container
   font-style: italic
+  max-width: 500px // improve readability
 
   &.-no-italic
     font-style: normal
@@ -522,6 +526,11 @@ select
 
   &:hover, &:focus, &:active
     border-color: #999
+
+select
+  &[disabled=disabled]
+    background-color: $inplace-edit--bg-color--disabled
+    cursor: not-allowed
 
 input[readonly].-clickable
   cursor: pointer
@@ -748,6 +757,11 @@ input[readonly].-clickable
 textarea
   text-rendering: optimizeLegibility
 
+.color-preview
+  margin-left: -34px
+  margin-top: auto
+  margin-bottom: auto
+
 
 // Overwriting Foundation color variables.
 // Unfortunatel I do not know how to get it DRY.
@@ -768,3 +782,11 @@ input[type=range]::-webkit-slider-thumb:hover
 
 input[type=range]::-ms-thumb:hover
   @include varprop(background, primary-color-dark)
+
+// Special handling for the permissions_form of Admin/Roles --> permission report
+// Since FF ESR is not able to handle the overflow of fieldsets correctly, a workaround is needed.
+@supports(-moz-appearance: none)
+  #permissions_form
+    display: inline-block
+    width: 100%
+    overflow: auto

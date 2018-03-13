@@ -30,6 +30,7 @@ import {opApiModule} from '../../../../angular-modules';
 import {HalResource} from '../hal-resources/hal-resource.service';
 import {HalResourceFactoryService} from '../hal-resource-factory/hal-resource-factory.service';
 import IPromise = angular.IPromise;
+import {CollectionResource} from '../hal-resources/collection-resource.service';
 
 export class HalRequestService {
   /**
@@ -38,7 +39,8 @@ export class HalRequestService {
   public defaultHeaders = {
     caching: {
       enabled: true
-    }
+    },
+    'Content-Type': 'application/json'
   };
 
   constructor(protected $q:ng.IQService,
@@ -49,12 +51,12 @@ export class HalRequestService {
   /**
    * Perform a HTTP request and return a HalResource promise.
    */
-  public request(method:string, href:string, data?:any, headers:any = {}):IPromise<HalResource> {
+  public request<T extends HalResource>(method:string, href:string, data?:any, headers:any = {}):IPromise<T> {
     if (!href) {
       return this.$q.reject();
     }
 
-    if (method === 'post') {
+    if (method.toUpperCase() !== 'GET') {
       data = data || {};
     }
 
@@ -82,7 +84,7 @@ export class HalRequestService {
 
     return this.$http(config)
       .then(createResource)
-      .catch(response => this.$q.reject(createResource(response)));
+      .catch(response => this.$q.reject(createResource(response) as T)) as ng.IPromise<T>;
   }
 
   /**
@@ -93,8 +95,46 @@ export class HalRequestService {
    * @param headers
    * @returns {ng.IPromise<HalResource>}
    */
-  public get(href:string, params?:any, headers?:any):IPromise<HalResource> {
+  public get<T extends HalResource>(href:string, params?:any, headers?:any):IPromise<T> {
     return this.request('get', href, params, headers);
+  }
+
+  /**
+   * Return all potential pages to the request, when the elements returned from API is smaller
+   * than the expected.
+   *
+   * @param href
+   * @param expected The expected number of elements
+   * @param params
+   * @param headers
+   * @return {Promise<CollectionResource[]>}
+   */
+  public async getAllPaginated(href:string, expected:number, params:any = {}, headers:any = {}) {
+    // Total number retrieved
+    let retrieved = 0;
+    // Current offset page
+    let page = 1;
+    // Accumulated results
+    const allResults:CollectionResource[] = [];
+    // If possible, request all at once.
+    params.pageSize = expected;
+
+    while (retrieved < expected) {
+      params.offset = page;
+
+      const results = await this.request('get', href, params, headers);
+
+      if (results.count === 0) {
+        throw 'No more results for this query, but expected more.';
+      }
+
+      allResults.push(results as CollectionResource);
+
+      retrieved += results.count;
+      page += 1;
+    }
+
+    return allResults;
   }
 
   /**
@@ -104,7 +144,7 @@ export class HalRequestService {
    * @param headers
    * @returns {ng.IPromise<HalResource>}
    */
-  public put(href:string, data?:any, headers?:any):IPromise<HalResource> {
+  public put<T extends HalResource>(href:string, data?:any, headers?:any):IPromise<T> {
     return this.request('put', href, data, headers);
   }
 
@@ -116,7 +156,7 @@ export class HalRequestService {
    * @param headers
    * @returns {ng.IPromise<HalResource>}
    */
-  public post(href:string, data?:any, headers?:any):IPromise<HalResource> {
+  public post<T extends HalResource>(href:string, data?:any, headers?:any):IPromise<T> {
     return this.request('post', href, data, headers);
   }
 
@@ -128,7 +168,7 @@ export class HalRequestService {
    * @param headers
    * @returns {ng.IPromise<HalResource>}
    */
-  public patch(href:string, data?:any, headers?:any):IPromise<HalResource> {
+  public patch<T extends HalResource>(href:string, data?:any, headers?:any):IPromise<T> {
     return this.request('patch', href, data, headers);
   }
 
@@ -140,7 +180,7 @@ export class HalRequestService {
    * @param headers
    * @returns {ng.IPromise<HalResource>}
    */
-  public delete(href:string, data?:any, headers?:any):IPromise<HalResource> {
+  public delete<T extends HalResource>(href:string, data?:any, headers?:any):IPromise<T> {
     return this.request('delete', href, data, headers);
   }
 }

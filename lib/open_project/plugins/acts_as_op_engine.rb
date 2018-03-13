@@ -52,6 +52,10 @@ module OpenProject::Plugins
           app.config.plugins_to_test_paths << root
         end
 
+        initializer "#{engine_name}.i18n_load_paths" do |app|
+          app.config.i18n.load_path += Dir[config.root.join('config', 'locales', 'crowdin', '*.{rb,yml}').to_s]
+        end
+
         initializer "#{engine_name}.register_cell_view_paths" do |_app|
           pathname = config.root.join("app/cells/views")
 
@@ -213,21 +217,16 @@ module OpenProject::Plugins
       def add_api_attribute(on:,
                             writable_for: [:create, :update],
                             ar_name:,
-                            api_name: ar_name,
+                            writeable: true,
                             &block)
         config.to_prepare do
           model_name = on.to_s.camelize
           namespace = model_name.pluralize
           Array(writable_for).each do |action|
-            contract_class = "::#{namespace}::#{action.to_s.camelize}Contract".constantize
-            contract_class.attribute ar_name, &block
-          end
-
-          if writable_for.any?
             # attribute is generally writable
-            # overrides might be defined in the more specific schema implementations
-            schema_class = "::API::V3::#{namespace}::Schema::Base#{model_name}Schema".constantize
-            schema_class.register_writable_property(api_name)
+            # overrides might be defined in the more specific contract implementations
+            contract_class = "::#{namespace}::#{action.to_s.camelize}Contract".constantize
+            contract_class.attribute ar_name, { writeable: writeable }, &block
           end
         end
       end

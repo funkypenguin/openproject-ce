@@ -100,9 +100,11 @@ describe Timeline, 'filtering custom fields', type: :feature, js: true do
 
   shared_examples_for 'filtering by bool custom field' do
     it 'filters accordingly' do
+      wp1.reload
       wp1.custom_field_values = { cf.id => false }
       wp1.save!
 
+      wp2.reload
       wp2.custom_field_values = { cf.id => true }
       wp2.save!
       wp3
@@ -134,7 +136,7 @@ describe Timeline, 'filtering custom fields', type: :feature, js: true do
 
       expect(page).to have_content wp1.subject
       expect(page).to have_no_content wp2.subject
-      expect(page).to have_no_content wp3.subject
+      expect(page).to have_content wp3.subject
 
       visit edit_project_timeline_path(project_id: project, id: timeline)
 

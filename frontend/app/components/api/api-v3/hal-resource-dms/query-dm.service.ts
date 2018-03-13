@@ -33,6 +33,7 @@ import {FormResource} from '../hal-resources/form-resource.service';
 import {opApiModule} from '../../../../angular-modules';
 import {HalRequestService} from '../hal-request/hal-request.service';
 import {PayloadDmService} from './payload-dm.service';
+import {ApiV3FilterBuilder} from '../api-v3-filter-builder';
 
 export interface PaginationObject {
   pageSize:number;
@@ -85,6 +86,27 @@ export class QueryDmService {
     return this.halRequest.get(url, queryData, {caching: {enabled: false} });
   }
 
+  public loadIdsUpdatedSince(ids:any, timestamp:any):ng.IPromise<WorkPackageCollectionResource> {
+    const filters = [
+      {
+        id: {
+          operator: '=',
+          values: ids.filter((n:String|null) => n) // no null values
+        },
+      },
+      {
+        updatedAt: {
+          operator: '<>d',
+          values: [timestamp, '']
+        }
+      }
+    ];
+
+    return this.halRequest.get(this.v3Path.wps(),
+                               {filters: JSON.stringify(filters)},
+                               {caching: {enabled: false} });
+  }
+
   public save(query:QueryResource, form:FormResource) {
     return this.extractPayload(query, form).then(payload => {
       return query.updateImmediately(payload);
@@ -95,8 +117,7 @@ export class QueryDmService {
     return this.extractPayload(query, form).then(payload => {
       let path = this.v3Path.queries();
 
-      return this.halRequest.post(path,
-                                  payload);
+      return this.halRequest.post(path, payload);
     });
   }
 
@@ -106,34 +127,24 @@ export class QueryDmService {
 
   public toggleStarred(query:QueryResource) {
     if (query.starred) {
-      return query.unstar() as ng.IPromise<QueryResource>;
+      return query.unstar();
     } else {
-      return query.star() as ng.IPromise<QueryResource>;
+      return query.star();
     }
   }
 
   public all(projectIdentifier?:string):ng.IPromise<CollectionResource> {
-    let filters = [];
+    let filters = new ApiV3FilterBuilder();
 
     if (projectIdentifier) {
       // all queries with the provided projectIdentifier
-      filters.push({
-                     project_identifier: {
-                       operator: '=',
-                       values: [projectIdentifier]
-                     }
-                   });
+      filters.add('project_identifier', '=',  [projectIdentifier]);
     } else {
       // all queries having no project (i.e. being global)
-      filters.push({
-                     project: {
-                       operator: '!*',
-                       values: []
-                     }
-                   });
+      filters.add('project', '!*', []);
     }
 
-    let urlQuery = { filters: JSON.stringify(filters) };
+    let urlQuery = { filters: filters.toJson() };
     let caching = { caching: {enabled: false} };
 
     return this.halRequest.get(this.v3Path.queries(),

@@ -27,13 +27,39 @@
 //++
 
 import {HalResource} from './hal-resource.service';
-import {opApiModule} from "../../../../angular-modules";
+import {opApiModule} from '../../../../angular-modules';
+import {FormResourceInterface} from './form-resource.service';
+
+export const v3ErrorIdentifierQueryInvalid = 'urn:openproject-org:api:v3:errors:InvalidQuery';
+export const v3ErrorIdentifierMultipleErrors = 'urn:openproject-org:api:v3:errors:MultipleErrors';
 
 export class ErrorResource extends HalResource {
   public errors:any[];
   public message:string;
   public details:any;
   public errorIdentifier:string;
+
+  public isValidationError:boolean = false;
+
+  public static fromFormResponse(form:FormResourceInterface):ErrorResource|null {
+    const errors = _.values(form.validationErrors);
+    const count = errors.length;
+
+    if (count === 0) {
+      return null;
+    }
+
+    let resource ;
+    if (count === 1)  {
+      resource = new ErrorResource(errors[0], true);
+    } else {
+      resource = new ErrorResource({});
+      resource.errorIdentifier = v3ErrorIdentifierMultipleErrors;
+      resource.errors = errors;
+    }
+    resource.isValidationError = true;
+    return resource;
+  }
 
   public get errorMessages():string[] {
     if (this.isMultiErrorMessage()) {
@@ -44,23 +70,29 @@ export class ErrorResource extends HalResource {
   }
 
   public isMultiErrorMessage() {
-    return this.errorIdentifier === 'urn:openproject-org:api:v3:errors:MultipleErrors';
+    return this.errorIdentifier === v3ErrorIdentifierMultipleErrors;
   }
 
   public getInvolvedAttributes():string[] {
     var columns = [];
 
     if (this.details) {
-      columns = [{ details: this.details }]
+      columns = [{ details: this.details }];
     }
     else if (this.errors) {
       columns = this.errors;
     }
 
-    return columns.map(field => field.details.attribute);
+    return _.flatten(columns.map((resource:ErrorResource) => {
+      if (resource.errorIdentifier === v3ErrorIdentifierMultipleErrors) {
+        return this.extractMultiError(resource)[0];
+      } else {
+        return resource.details.attribute;
+      }
+    }));
   }
 
-  public getMessagesPerAttribute():{ [attribute:string]: string[] } {
+  public getMessagesPerAttribute():{ [attribute:string]:string[] } {
     let perAttribute:any = {};
 
     if (this.details) {
@@ -68,7 +100,11 @@ export class ErrorResource extends HalResource {
     }
     else {
       _.forEach(this.errors, (error:any) => {
-        if (perAttribute[error.details.attribute]) {
+        if (error.errorIdentifier === v3ErrorIdentifierMultipleErrors) {
+          const [attribute, messages] = this.extractMultiError(error);
+          let current = perAttribute[attribute] || [];
+          perAttribute[attribute] = current.concat(messages);
+        } else if (perAttribute[error.details.attribute]) {
           perAttribute[error.details.attribute].push(error.message);
         }
         else {
@@ -78,6 +114,13 @@ export class ErrorResource extends HalResource {
     }
 
     return perAttribute;
+  }
+
+  protected extractMultiError(resource:ErrorResource):[string, string[]] {
+    let attribute = resource.errors[0].details.attribute;
+    let messages = resource.errors.map((el:ErrorResource) => el.message);
+
+    return [attribute, messages];
   }
 }
 

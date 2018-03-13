@@ -85,7 +85,7 @@ module OpenProject
 
       # it is OK if more languages exist
       it 'has a language for every language file' do
-        lang_files_count = Dir.glob(Rails.root.join('config/locales/*.yml'))
+        lang_files_count = Dir.glob(Rails.root.join('config/locales/**/*.yml'))
                            .map { |f| File.basename(f) }
                            .reject { |b| b.starts_with? 'js' }
                            .size
@@ -149,6 +149,12 @@ module OpenProject
 
       it 'can be found by uppercase if it is active' do
         expect(find_language(:DE)).to eql :de
+      end
+
+      it 'is nil if non valid string is passed' do
+        expect(find_language('*')).to be_nil
+        expect(find_language('78445')).to be_nil
+        expect(find_language('/)(')).to be_nil
       end
     end
 

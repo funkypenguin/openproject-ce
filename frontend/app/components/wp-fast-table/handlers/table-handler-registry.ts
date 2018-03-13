@@ -4,14 +4,17 @@ import {WorkPackageTable} from "../wp-fast-table";
 import {SelectionTransformer} from "./state/selection-transformer";
 import {RowsTransformer} from "./state/rows-transformer";
 import {ColumnsTransformer} from "./state/columns-transformer";
-import {ContextMenuKeyboardHandler} from "./row/context-menu-keyboard-handler";
-import {ContextMenuHandler} from "./row/context-menu-handler";
+import {ContextMenuKeyboardHandler} from "./context-menu/context-menu-keyboard-handler";
 import {GroupRowHandler} from "./row/group-row-handler";
 import {RowDoubleClickHandler} from "./row/double-click-handler";
 import {RowClickHandler} from "./row/click-handler";
 import {WorkPackageStateLinksHandler} from "./row/wp-state-links-handler";
 import {EditCellHandler} from "./cell/edit-cell-handler";
 import {HierarchyClickHandler} from "./row/hierarchy-click-handler";
+import {RelationsCellHandler} from './cell/relations-cell-handler';
+import {RelationsTransformer} from './state/relations-transformer';
+import {ContextMenuRightClickHandler} from "./context-menu/context-menu-rightclick-handler";
+import {ContextMenuClickHandler} from "./context-menu/context-menu-click-handler";
 
 export interface TableEventHandler {
   EVENT:string;
@@ -30,13 +33,18 @@ export class TableHandlerRegistry {
     t => new WorkPackageStateLinksHandler(t),
     // Clicking on the row (not within a cell)
     t => new RowClickHandler(t),
+    // Double Clicking on the row (not within a cell)
     t => new RowDoubleClickHandler(t),
     // Clicking on group headers
     t => new GroupRowHandler(t),
     // Right clicking on rows
-    t => new ContextMenuHandler(t),
+    t => new ContextMenuRightClickHandler(t),
+    // Left clicking on the dropdown icon
+    t => new ContextMenuClickHandler(t),
     // SHIFT+ALT+F10 on rows
     t => new ContextMenuKeyboardHandler(t),
+    // Clicking on relations cells
+    t => new RelationsCellHandler(t)
   ];
 
   static stateTransformers = [
@@ -44,7 +52,8 @@ export class TableHandlerRegistry {
     RowsTransformer,
     ColumnsTransformer,
     TimelineTransformer,
-    HierarchyTransformer
+    HierarchyTransformer,
+    RelationsTransformer
   ];
 
   static attachTo(table: WorkPackageTable) {

@@ -35,7 +35,7 @@ Redmine::MenuManager.map :top_menu do |menu|
   # Redmine::MenuManager::TopMenuHelper#render_projects_top_menu_node
 
   menu.push :work_packages,
-            { controller: '/work_packages', project_id: nil, action: 'index' },
+            { controller: '/work_packages', project_id: nil, state: nil, action: 'index' },
             context: :modules,
             caption: I18n.t('label_work_package_plural'),
             if: Proc.new {
@@ -77,7 +77,7 @@ Redmine::MenuManager.map :account_menu do |menu|
             html: { class: 'hidden-for-mobile' },
             if: Proc.new { User.current.logged? }
   menu.push :administration,
-            { controller: '/admin', action: 'projects' },
+            { controller: '/users', action: 'index' },
             html: { class: 'hidden-for-mobile' },
             if: Proc.new { User.current.admin? }
   menu.push :logout, :signout_path,
@@ -121,11 +121,6 @@ Redmine::MenuManager.map :my_menu do |menu|
 end
 
 Redmine::MenuManager.map :admin_menu do |menu|
-  menu.push :projects,
-            { controller: '/admin', action: 'projects' },
-            caption: :label_project_plural,
-            icon: 'icon2 icon-show-all-projects'
-
   menu.push :users,
             { controller: '/users' },
             caption: :label_user_plural,
@@ -162,6 +157,14 @@ Redmine::MenuManager.map :admin_menu do |menu|
             icon: 'icon2 icon-custom-fields',
             html: { class: 'custom_fields' }
 
+  menu.push :attribute_help_texts,
+            { controller: '/attribute_help_texts' },
+            caption: :'attribute_help_texts.label_plural',
+            icon: 'icon2 icon-help2',
+            if: Proc.new {
+              EnterpriseToken.allows_to?(:attribute_help_texts)
+            }
+
   menu.push :enumerations,
             { controller: '/enumerations' },
             icon: 'icon2 icon-enumerations'
@@ -173,7 +176,8 @@ Redmine::MenuManager.map :admin_menu do |menu|
 
   menu.push :ldap_authentication,
             { controller: '/ldap_auth_sources', action: 'index' },
-            html: { class: 'server_authentication icon2 icon-flag' },
+            html: { class: 'server_authentication' },
+            icon: 'icon2 icon-flag',
             if: proc { !OpenProject::Configuration.disable_password_login? }
 
   menu.push :announcements,
@@ -245,8 +249,7 @@ Redmine::MenuManager.map :project_menu do |menu|
             { controller: '/work_packages/reports', action: 'report' },
             param: :project_id,
             caption: :label_workflow_summary,
-            parent: :work_packages,
-            icon: 'icon2 icon-chart3'
+            parent: :work_packages
 
   menu.push :timelines,
             { controller: '/timelines', action: 'index' },

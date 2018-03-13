@@ -2,20 +2,22 @@ import {wpDirectivesModule} from '../../../angular-modules';
 import {WorkPackageCacheService} from '../../work-packages/work-package-cache.service';
 import {WorkPackageNotificationService} from '../../wp-edit/wp-notification.service';
 import {WorkPackageResourceInterface} from '../../api/api-v3/hal-resources/work-package-resource.service';
-import {WorkPackageRelationsService} from '../wp-relations.service';
 import {
-  RelationResourceInterface,
-  RelationResource
+  RelationResource,
+  RelationResourceInterface
 } from '../../api/api-v3/hal-resources/relation-resource.service';
+import {WorkPackageRelationsService} from '../wp-relations.service';
+import {keyCodes} from 'core-components/common/keyCodes.enum';
 
 class WpRelationRowDirectiveController {
-  public workPackage: WorkPackageResourceInterface;
-  public relatedWorkPackage: WorkPackageResourceInterface;
-  public relationType: string;
+  public workPackage:WorkPackageResourceInterface;
+  public relatedWorkPackage:WorkPackageResourceInterface;
+  public relationType:string;
+  public groupByWorkPackageType:boolean;
   public showRelationInfo:boolean = false;
   public showEditForm:boolean = false;
-  public availableRelationTypes: RelationResourceInterface[];
-  public selectedRelationType: RelationResourceInterface;
+  public availableRelationTypes:{ name:string }[];
+  public selectedRelationType:RelationResourceInterface;
 
   public userInputs = {
     newRelationText: '',
@@ -30,20 +32,20 @@ class WpRelationRowDirectiveController {
     field: {
       required: false
     }
-  }
+  };
 
   public relation:RelationResourceInterface;
-  public text: Object;
+  public text:Object;
 
-  constructor(protected $scope: ng.IScope,
-              protected $element: ng.IAugmentedJQuery,
+  constructor(protected $scope:ng.IScope,
+              protected $element:ng.IAugmentedJQuery,
               protected $timeout:ng.ITimeoutService,
               protected $http:ng.IHttpService,
-              protected wpCacheService: WorkPackageCacheService,
-              protected wpNotificationsService: WorkPackageNotificationService,
-              protected wpRelations: WorkPackageRelationsService,
+              protected wpCacheService:WorkPackageCacheService,
+              protected wpNotificationsService:WorkPackageNotificationService,
+              protected wpRelations:WorkPackageRelationsService,
               protected I18n:op.I18n,
-              protected PathHelper: op.PathHelper) {
+              protected PathHelper:op.PathHelper) {
 
     this.relation = this.relatedWorkPackage.relatedBy as RelationResourceInterface;
     this.text = {
@@ -59,8 +61,9 @@ class WpRelationRowDirectiveController {
     };
 
     this.userInputs.newRelationText = this.relation.description || '';
-    this.availableRelationTypes = wpRelations.getRelationTypes(true);
-    this.selectedRelationType = _.find(this.availableRelationTypes, {'name': this.relation.type}) as RelationResourceInterface;
+    this.availableRelationTypes = RelationResource.LOCALIZED_RELATION_TYPES(false);
+    this.selectedRelationType = _.find(this.availableRelationTypes,
+      {'name': this.relation.normalizedType(this.workPackage)}) as RelationResourceInterface;
   };
 
   /**
@@ -102,9 +105,8 @@ class WpRelationRowDirectiveController {
 
   public saveDescription() {
     this.wpRelations.updateRelation(
-      this.workPackage.id,
       this.relation,
-      { description: this.userInputs.newRelationText })
+      {description: this.userInputs.newRelationText})
       .then((savedRelation:RelationResourceInterface) => {
         this.relation = savedRelation;
         this.relatedWorkPackage.relatedBy = savedRelation;
@@ -117,18 +119,32 @@ class WpRelationRowDirectiveController {
     return this.userInputs.showRelationInfo || this.relation.description;
   }
 
+  public activateRelationTypeEdit() {
+    if (this.groupByWorkPackageType) {
+      this.userInputs.showRelationTypesForm = true;
+    }
+  }
+
+  public cancelRelationTypeEditOnEscape(evt:JQueryEventObject) {
+    if (evt.which === keyCodes.ESCAPE) {
+      this.userInputs.showRelationTypesForm = false;
+    }
+  }
+
   public saveRelationType() {
-    this.wpRelations.updateRelation(
-      this.workPackage.id,
+    this.wpRelations.updateRelationType(
+      this.workPackage,
+      this.relatedWorkPackage,
       this.relation,
-      { type: this.selectedRelationType.name })
+      this.selectedRelationType.name)
       .then((savedRelation:RelationResourceInterface) => {
         this.wpNotificationsService.showSave(this.relatedWorkPackage);
         this.relatedWorkPackage.relatedBy = savedRelation;
         this.relation = savedRelation;
 
         this.userInputs.showRelationTypesForm = false;
-      });
+      })
+      .catch((error) => this.wpNotificationsService.handleErrorResponse(error, this.workPackage));
   }
 
   public toggleUserDescriptionForm() {
@@ -144,22 +160,23 @@ class WpRelationRowDirectiveController {
           angular.element('#relation--add-relation').focus();
         });
       })
-      .catch((err:any) => this.wpNotificationsService.handleErrorResponse(err, this.relatedWorkPackage));
+      .catch((err:any) => this.wpNotificationsService.handleErrorResponse(err,
+        this.relatedWorkPackage));
   }
 }
 
-function WpRelationRowDirective($timeout:ng.ITimeoutService) {
+function WpRelationRowDirective($timeout:ng.ITimeoutService):any {
   return {
-    restrict:'E',
-    templateUrl:'/components/wp-relations/wp-relation-row/wp-relation-row.template.html',
-    scope:{
+    restrict: 'E',
+    templateUrl: '/components/wp-relations/wp-relation-row/wp-relation-row.template.html',
+    scope: {
       workPackage: '=',
       groupByWorkPackageType: '=',
       relatedWorkPackage: '='
     },
-    controller:WpRelationRowDirectiveController,
-    controllerAs:'$ctrl',
-    bindToController:true
+    controller: WpRelationRowDirectiveController,
+    controllerAs: '$ctrl',
+    bindToController: true
   };
 }
 

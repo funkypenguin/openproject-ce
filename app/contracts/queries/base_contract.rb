@@ -1,4 +1,5 @@
 #-- encoding: UTF-8
+
 #-- copyright
 # OpenProject is a project management system.
 # Copyright (C) 2012-2017 the OpenProject Foundation (OPF)
@@ -37,6 +38,8 @@ module Queries
     attribute :is_public # => public
     attribute :display_sums # => sums
     attribute :timeline_visible
+    attribute :timeline_zoom_level
+    attribute :timeline_labels
     attribute :show_hierarchies
 
     attribute :column_names # => columns
@@ -45,15 +48,23 @@ module Queries
     attribute :sort_criteria # => sortBy
     attribute :group_by # => groupBy
 
-    attr_reader :user
+    def self.model
+      Query
+    end
 
-    validate :validate_project
-    validate :user_allowed_to_make_public
+    attr_reader :user
 
     def initialize(query, user)
       super query
 
       @user = user
+    end
+
+    def validate
+      validate_project
+      user_allowed_to_make_public
+
+      super
     end
 
     def validate_project

@@ -22,8 +22,8 @@ export class GroupedRenderPass extends PlainRenderPass {
    */
   protected doRender() {
     let currentGroup:GroupObject | null = null;
-    this.workPackageTable.rows.forEach((wpId:string) => {
-      let row = this.workPackageTable.rowIndex[wpId];
+    this.workPackageTable.originalRows.forEach((wpId:string) => {
+      let row = this.workPackageTable.originalRowIndex[wpId];
       let nextGroup = this.matchingGroup(row.object);
 
       if (nextGroup && currentGroup !== nextGroup) {
@@ -64,7 +64,11 @@ export class GroupedRenderPass extends PlainRenderPass {
 
       // Otherwise, fall back to simple value comparison.
       let value = group.value === '' ? null : group.value;
-      return value === property;
+
+      // Values provided by the API are always string
+      // so avoid triple equal here
+      // tslint:disable-next-line
+      return value == property;
     }) as GroupObject;
   }
 
@@ -91,14 +95,17 @@ export class GroupedRenderPass extends PlainRenderPass {
     const group = row.group!;
     const hidden = group.collapsed;
 
+    let additionalClasses:string[] = [];
+
     let [tr, _] = this.rowBuilder.buildEmpty(row.object);
-    tr.classList.add(groupedRowClassName(group.index as number));
+    additionalClasses.push(groupedRowClassName(group.index as number));
 
     if (hidden) {
-      tr.classList.add(collapsedRowClass);
+      additionalClasses.push(collapsedRowClass);
     }
 
     row.element = tr;
-    this.appendRow(row.object, tr, [groupedRowClassName(group.index as number)], hidden);
+    tr.classList.add(...additionalClasses);
+    this.appendRow(row.object, tr, additionalClasses, hidden);
   }
 }

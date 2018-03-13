@@ -32,56 +32,54 @@ import {WorkPackageResourceInterface} from "../../api/api-v3/hal-resources/work-
 import {WorkPackageCacheService} from "../../work-packages/work-package-cache.service";
 
 export class WorkPackageRelationsHierarchyController {
-  public workPackage: WorkPackageResourceInterface;
-  public showEditForm: boolean = false;
+  public workPackage:WorkPackageResourceInterface;
+  public showEditForm:boolean = false;
   public workPackagePath = this.PathHelper.workPackagePath;
   public canHaveChildren = !this.workPackage.isMilestone;
   public canModifyHierarchy = !!this.workPackage.changeParent;
   public canAddRelation = !!this.workPackage.addRelation;
 
-  constructor(protected $scope: ng.IScope,
-              protected $rootScope: ng.IRootScopeService,
-              protected $q: ng.IQService,
-              protected wpCacheService: WorkPackageCacheService,
-              protected PathHelper: op.PathHelper,
-              protected I18n: op.I18n) {
+  constructor(protected $scope:ng.IScope,
+              protected $rootScope:ng.IRootScopeService,
+              protected $q:ng.IQService,
+              protected wpCacheService:WorkPackageCacheService,
+              protected PathHelper:op.PathHelper,
+              protected I18n:op.I18n) {
 
     scopedObservable(
       this.$scope,
       this.wpCacheService.loadWorkPackage(this.workPackage.id).values$())
-      .subscribe((wp: WorkPackageResourceInterface) => {
+      .subscribe((wp:WorkPackageResourceInterface) => {
         this.workPackage = wp;
-        this.loadParent();
-        this.loadChildren();
+
+        let toLoad:string[] = [];
+
+        if (this.workPackage.parent) {
+          toLoad.push(this.workPackage.parent.id);
+
+          scopedObservable(
+            this.$scope,
+            this.wpCacheService.loadWorkPackage(this.workPackage.parent.id).values$())
+            .take(1)
+            .subscribe((parent:WorkPackageResourceInterface) => {
+              this.workPackage.parent = parent;
+            });
+        }
+
+        if (this.workPackage.children) {
+          toLoad.push(...this.workPackage.children.map(child => child.id));
+        }
+
+        this.wpCacheService.requireAll(toLoad);
       });
   }
 
   public text = {
     hierarchyHeadline: this.I18n.t('js.relations_hierarchy.hierarchy_headline')
   };
-
-  protected loadChildren() {
-    if (this.workPackage.children) {
-      this.workPackage.children.map(child => child.$load());
-    }
-  }
-
-  protected loadParent() {
-    if (!angular.isNumber(this.workPackage.parentId)) {
-      return;
-    }
-
-    scopedObservable(
-      this.$scope,
-      this.wpCacheService.loadWorkPackage(this.workPackage.parentId.toString()).values$())
-      .take(1)
-      .subscribe((parent: WorkPackageResourceInterface) => {
-        this.workPackage.parent = parent;
-      });
-  }
 }
 
-function wpRelationsDirective() {
+function wpRelationsDirective():any {
   return {
     restrict: 'E',
     templateUrl: '/components/wp-relations/wp-relations-hierarchy/wp-relations-hierarchy.template.html',
@@ -97,4 +95,5 @@ function wpRelationsDirective() {
   };
 }
 
-wpDirectivesModule.directive('wpRelationsHierarchy', wpRelationsDirective);
+wpDirectivesModule
+  .directive('wpRelationsHierarchy', wpRelationsDirective);

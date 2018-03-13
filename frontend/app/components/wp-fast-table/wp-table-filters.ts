@@ -26,25 +26,16 @@
 // See doc/COPYRIGHT.rdoc for more details.
 // ++
 
-import {
-  QueryFilterResource,
-} from '../api/api-v3/hal-resources/query-filter-resource.service';
-import {
-  QueryFilterInstanceResource,
-} from '../api/api-v3/hal-resources/query-filter-instance-resource.service';
-import {QueryResource} from '../api/api-v3/hal-resources/query-resource.service';
+import {QueryFilterResource} from '../api/api-v3/hal-resources/query-filter-resource.service';
+import {QueryFilterInstanceResource} from '../api/api-v3/hal-resources/query-filter-instance-resource.service';
 import {QuerySchemaResourceInterface} from '../api/api-v3/hal-resources/query-schema-resource.service';
 import {QueryFilterInstanceSchemaResource} from '../api/api-v3/hal-resources/query-filter-instance-schema-resource.service';
-import {HalResource} from "../api/api-v3/hal-resources/hal-resource.service";
-import {WorkPackageTableBaseState} from "./wp-table-base";
+import {WorkPackageTableBaseState} from './wp-table-base';
 
 export class WorkPackageTableFilters extends WorkPackageTableBaseState<QueryFilterInstanceResource[]> {
+
   public availableSchemas:QueryFilterInstanceSchemaResource[] = [];
   public current:QueryFilterInstanceResource[] = [];
-
-  public comparerFunction():(current:QueryFilterInstanceResource[]) => any {
-    return (current:QueryFilterInstanceResource[]) => current.map((el:HalResource) => el.$plain());
-  }
 
   constructor(filters:QueryFilterInstanceResource[], schema:QuerySchemaResourceInterface) {
     super();
@@ -86,6 +77,11 @@ export class WorkPackageTableFilters extends WorkPackageTableBaseState<QueryFilt
   }
 
   private get availableFilters() {
-    return this.availableSchemas.map(schema => (schema.filter.allowedValues as QueryFilterResource[])[0]);
+    let availableFilters = this.availableSchemas
+                               .map(schema => (schema.filter.allowedValues as QueryFilterResource[])[0]);
+
+    // We do not use the id filter as of now as we do not have adequate
+    // means to select the values.
+    return _.filter(availableFilters, filter => filter.id !== 'id');
   }
 }

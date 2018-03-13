@@ -33,7 +33,12 @@ $toggler-width: 40px
   width: $main-menu-width
   float: left
   left: 0
-  background-color: $main-menu-bg-color
+  border-right: $main-menu-border-width solid $main-menu-border-color
+
+  // min-height is full height minus header and footer.
+  min-height: calc(100vh - 55px - 55px)
+
+  @include varprop(background-color, main-menu-bg-color)
   @include default-transition
 
   #menu-sidebar
@@ -41,7 +46,9 @@ $toggler-width: 40px
     height: calc(100% - 40px)
   %absolute-layout-mode &
     position: relative
-    height:   100%
+    // In WP list, the footer is just a 5px border:
+    height: calc(100vh - 55px - 5px)
+
     #menu-sidebar
       +allow-vertical-scrolling
       -ms-overflow-style: -ms-autohiding-scrollbar
@@ -50,7 +57,6 @@ $toggler-width: 40px
     padding: 0
 
     &.menu_root
-      border-right: $main-menu-border-width solid $main-menu-border-color
 
       // -------------------- ALL menu items ---------------------------
       li
@@ -65,11 +71,6 @@ $toggler-width: 40px
         &.ng-leave
           @include animation(0.5s fade-out)
 
-        a
-          background: none
-          &:before
-            padding-right: 25px
-
         [class*="-menu-item"]
           display: flex
           align-items: center
@@ -82,12 +83,13 @@ $toggler-width: 40px
           @include default-transition
 
           &:hover
-            @include varprop(background, main-menu-bg-hover-background)
-
             @if $main-menu-enable-toggle-highlighting != true
               // simultaneously hover all menu item anchor tags
               > a
-                @include varprop(color, main-menu-selected-font-color)
+                @include varprop(color, main-menu-hover-font-color)
+                &.toggler
+                  @include varprop(background, main-menu-bg-hover-background)
+
 
           > a
             @include default-transition
@@ -98,11 +100,12 @@ $toggler-width: 40px
               &:hover
                 @include varprop(background, main-menu-bg-hover-background)
 
-            &:hover, &.selected, &.selected + a
+            &.selected, &.selected + a
               @include varprop(color, main-menu-selected-font-color)
 
             &:hover
               @include varprop(background, main-menu-bg-hover-background)
+              @include varprop(color, main-menu-hover-font-color)
 
 
           // placeholder for highlighted left-item-border
@@ -144,7 +147,7 @@ $toggler-width: 40px
           @if $main-menu-enable-toggle-highlighting != true
             // simultaneously hover all menu item anchor tags
             > a
-              color: $main-menu-child-selected-font-color
+              @include varprop(color, main-menu-child-hover-font-color)
 
         > a
           @include default-transition
@@ -154,10 +157,11 @@ $toggler-width: 40px
 
 
           &:hover, &.selected, &.selected + a
-            color: $main-menu-child-selected-font-color
+            @include varprop(color, main-menu-child-selected-font-color)
 
         a
-          padding-left: 12px
+          // children have no icon so we need to push them right.
+          padding-left: 54px
           font-size: $main-menu-child-font-size
           line-height: $main-menu-child-item-height
           height: $main-menu-child-item-height
@@ -166,11 +170,10 @@ $toggler-width: 40px
 
           &:hover
             text-decoration: none
-            color: $main-menu-child-selected-font-color
+            @include varprop(color, main-menu-child-hover-font-color)
           &.selected
             border: none !important
-            color: $main-menu-child-selected-font-color
-            font-weight: bold
+            @include varprop(color, main-menu-child-selected-font-color)
 
   a
     text-decoration: none
@@ -192,15 +195,18 @@ $toggler-width: 40px
     float: left
 
   #toggle-project-menu
-    border: $main-menu-item-border-width solid $main-menu-item-border-color
+    border-width: $main-menu-item-border-width 0 $main-menu-item-border-width $main-menu-item-border-width
+    border-style: solid
+    border-color: $main-menu-item-border-color
     height: $main-menu-item-height
-    width: $main-menu-width
-    background-color: $main-menu-bg-color
+    width: calc(#{$main-menu-width} - 1px)
+
+    @include varprop(background-color, main-menu-bg-color)
     @include default-transition
     &:hover
       @include varprop(background, main-menu-bg-hover-background)
     &.show
-      width: $main-menu-folded-width
+      width: calc(#{$main-menu-folded-width} - 1px)
       a.navigation-toggler
         height: 100%
         padding: 0 10px 0 0
@@ -212,6 +218,10 @@ $toggler-width: 40px
       height: $main-menu-item-height
       text-align: right
       padding: 0 6px 0 0
+
+      // Center toggle icon vertically. The element is higher than it looks like.
+      line-height: 38px
+      font-size: 11px
       &:hover
         @include varprop(color, main-menu-navigation-toggler-font-hover-color)
   .toggle-follow
@@ -224,12 +234,20 @@ $toggler-width: 40px
 .hidden-navigation
   #main-menu
     width: $main-menu-folded-width
-    .ellipsis
-      text-overflow: clip
-      -o-text-overflow: clip
-      -ms-text-overflow: clip
-    .toggler
-      display: none
+    ul
+      &.menu_root
+        > li
+          .main-item-wrapper
+            a:not(:only-child):first-of-type
+              @extend .small-12
+
+          .ellipsis
+            text-overflow: clip
+            -o-text-overflow: clip
+            -ms-text-overflow: clip
+          .toggler
+            display: none
+
   #sidebar,
   .menu-children
     display: none
@@ -280,3 +298,15 @@ $toggler-width: 40px
       border: none
     li a
       padding: 0
+
+
+
+// #main.hidden-navigation
+//   #main-menu
+//     ul
+//       &.menu_root
+//         // -------------------- MAIN menu items ---------------------------
+//         > li
+//           .main-item-wrapper
+//             a:not(:only-child):first-of-type
+//               @extend .small-12

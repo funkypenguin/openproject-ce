@@ -1,19 +1,38 @@
-import {injectorBridge} from "../../../angular/angular-injector-bridge.functions";
+import {$injectFields} from "../../../angular/angular-injector-bridge.functions";
 import {States} from "../../../states.service";
-import {rowClassName} from "../../builders/rows/single-row-builder";
+import {tableRowClassName} from "../../builders/rows/single-row-builder";
 import {checkedClassName} from "../../builders/ui-state-link-builder";
-import {rowId} from "../../helpers/wp-table-row-helpers";
+import {rowId, locateTableRow, scrollTableRowIntoView} from "../../helpers/wp-table-row-helpers";
 import {WorkPackageTableSelection} from "../../state/wp-table-selection.service";
 import {WorkPackageTable} from "../../wp-fast-table";
 import {WPTableRowSelectionState} from "../../wp-table.interfaces";
+import {WorkPackageTableFocusService} from "core-components/wp-fast-table/state/wp-table-focus.service";
 
 export class SelectionTransformer {
   public wpTableSelection:WorkPackageTableSelection;
+  public wpTableFocus:WorkPackageTableFocusService;
   public states:States;
+  public FocusHelper:any;
 
   constructor(table:WorkPackageTable) {
-    injectorBridge(this);
+    $injectFields(this, 'wpTableSelection', 'wpTableFocus', 'states', 'FocusHelper');
 
+    // Focus a single selection when active
+    this.states.table.rendered.values$()
+      .takeUntil(this.states.table.stopAllSubscriptions)
+      .subscribe(() => {
+
+        this.wpTableFocus.ifShouldFocus((wpId:string) => {
+          const element = locateTableRow(wpId);
+          if (element.length) {
+            scrollTableRowIntoView(wpId);
+            this.FocusHelper.focusElement(element, true);
+          }
+        });
+    });
+
+
+    // Update selection state
     this.wpTableSelection.selectionState.values$()
       .takeUntil(this.states.table.stopAllSubscriptions)
       .subscribe((state: WPTableRowSelectionState) => {
@@ -22,7 +41,7 @@ export class SelectionTransformer {
 
     // Bind CTRL+A to select all work packages
     Mousetrap.bind(['command+a', 'ctrl+a'], (e) => {
-      this.wpTableSelection.selectAll(table.rows);
+      this.wpTableSelection.selectAll(table.renderedRows);
 
       e.preventDefault();
       return false;
@@ -40,12 +59,11 @@ export class SelectionTransformer {
    * Update all currently visible rows to match the selection state.
    */
   private renderSelectionState(state:WPTableRowSelectionState) {
-    jQuery(`.${rowClassName}.${checkedClassName}`).removeClass(checkedClassName);
+    jQuery(`.${tableRowClassName}.${checkedClassName}`).removeClass(checkedClassName);
 
     _.each(state.selected, (selected: boolean, workPackageId:any) => {
-      jQuery(`#${rowId(workPackageId)}`).toggleClass(checkedClassName, selected);
+      jQuery(`.${tableRowClassName}[data-work-package-id="${workPackageId}"]`).toggleClass(checkedClassName, selected);
     });
   }
 }
 
-SelectionTransformer.$inject = ['wpTableSelection', 'states'];

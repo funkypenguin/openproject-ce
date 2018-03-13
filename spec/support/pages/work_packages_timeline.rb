@@ -36,19 +36,25 @@ module Pages
     end
 
     def timeline_row_selector(wp_id)
-      "#wp-timeline-row-#{wp_id}"
+      ".wp-row-#{wp_id}-timeline"
     end
 
     def timeline_container
       '.work-packages-tabletimeline--timeline-side'
     end
 
+    def expect_row_count(num)
+      expect(page).to have_selector('.wp-timeline-cell', count: num)
+    end
+
     def expect_work_package_listed(*work_packages)
       super(*work_packages)
 
-      within(table_container) do
-        work_packages.each do |wp|
-          expect(page).to have_selector("#wp-timeline-row-#{wp.id}", visible: true)
+      if page.has_selector?('#work-packages-timeline-toggle-button.-active')
+        within(timeline_container) do
+          work_packages.each do |wp|
+            expect(page).to have_selector(".wp-row-#{wp.id}-timeline", visible: true)
+          end
         end
       end
     end
@@ -56,9 +62,11 @@ module Pages
     def expect_work_package_not_listed(*work_packages)
       super(*work_packages)
 
-      within(table_container) do
-        work_packages.each do |wp|
-          expect(page).to have_no_selector("#wp-timeline-row-#{wp.id}", visible: true)
+      if page.has_selector?('#work-packages-timeline-toggle-button.-active')
+        within(timeline_container) do
+          work_packages.each do |wp|
+            expect(page).to have_no_selector(".wp-row-#{wp.id}-timeline", visible: true)
+          end
         end
       end
     end
@@ -73,20 +81,40 @@ module Pages
       end
     end
 
+    def timeline_row(wp_id)
+      ::Components::Timelines::TimelineRow.new  page.find(timeline_row_selector(wp_id))
+    end
+
+    def zoom_in
+      page.find('#work-packages-timeline-zoom-in-button').click
+    end
+
+    def zoom_out
+      page.find('#work-packages-timeline-zoom-out-button').click
+    end
+
+    def expect_zoom_at(value)
+      unless ::Query.timeline_zoom_levels.key?(value)
+        raise ArgumentError, "Invalid value"
+      end
+
+      expect(page).to have_selector(".wp-table-timeline--header-inner[data-current-zoom-level='#{value}'")
+    end
+
     def expect_timeline_element(work_package)
       type = work_package.milestone? ? :milestone : :bar
-      expect(page).to have_selector("#{timeline_row_selector(work_package.id)} .timeline-element.#{type}")
+      expect(page).to have_selector(".wp-row-#{work_package.id}-timeline .timeline-element.#{type}")
     end
 
     def expect_timeline_relation(from, to)
       within(timeline_container) do
-        expect(page).to have_selector(".relation-line.__tl-relation-#{from.id}-#{to.id}", minimum: 1)
+        expect(page).to have_selector(".relation-line.__tl-relation-#{from.id}.__tl-relation-#{to.id}", minimum: 1)
       end
     end
 
     def expect_no_timeline_relation(from, to)
       within(timeline_container) do
-        expect(page).to have_no_selector(".relation-line.__tl-relation-#{from.id}-#{to.id}")
+        expect(page).to have_no_selector(".relation-line.__tl-relation-#{from.id}.__tl-relation-#{to.id}")
       end
     end
 
@@ -97,7 +125,7 @@ module Pages
     end
 
     def expect_hidden_row(work_package)
-      expect(page).to have_selector("#wp-timeline-row-#{work_package.id}", visible: :hidden)
+      expect(page).to have_selector(".wp-row-#{work_package.id}-timeline", visible: :hidden)
     end
   end
 end

@@ -49,31 +49,29 @@ describe OpenProject::GithubIntegration do
     let(:wps) { [wp1, wp2, wp3, wp4] }
 
     it "should handle the pull_request creation payload" do
-      params = ActionController::Parameters.new({
-        'webhook' => {
-          'action' => 'opened',
-          'number' => '5',
-          'pull_request' => {
-            'title' => 'Bugfixes',
-            'body' => "Fixes http://example.net/wp/#{wp1.id} and " +
-                      "https://example.net/work_packages/#{wp2.id} and " +
-                      "http://example.net/subdir/wp/#{wp3.id} and " +
-                      "https://example.net/subdir/work_packages/#{wp4.id}.",
-            'html_url' => 'http://pull.request',
-            'base' => {
-              'repo' => {
-                'full_name' => 'full/name',
-                'html_url' => 'http://pull.request'
-              }
+      params = ActionController::Parameters.new(
+        'action' => 'opened',
+        'number' => '5',
+        'pull_request' => {
+          'title' => 'Bugfixes',
+          'body' => "Fixes http://example.net/wp/#{wp1.id} and " +
+                    "https://example.net/work_packages/#{wp2.id} and " +
+                    "http://example.net/subdir/wp/#{wp3.id} and " +
+                    "https://example.net/subdir/work_packages/#{wp4.id}.",
+          'html_url' => 'http://pull.request',
+          'base' => {
+            'repo' => {
+              'full_name' => 'full/name',
+              'html_url' => 'http://pull.request'
             }
-          },
-          'sender' => {
-            'login' => 'github_login',
-            'html_url' => 'http://user.name'
-          },
-          'repository' => {}
-        }
-      })
+          }
+        },
+        'sender' => {
+          'login' => 'github_login',
+          'html_url' => 'http://user.name'
+        },
+        'repository' => {}
+      )
 
       environment = {
         'HTTP_X_GITHUB_EVENT' => 'pull_request',
@@ -82,6 +80,8 @@ describe OpenProject::GithubIntegration do
 
       journal_count = wps.map { |wp| wp.journals.count }
       OpenProject::GithubIntegration::HookHandler.new.process('github', environment, params, user)
+
+      [wp1,wp2,wp3,wp4].map { |x| x.reload }
 
       expect(wp1.journals.count).to equal(journal_count[0] + 1)
       expect(wp2.journals.count).to equal(journal_count[1] + 1)
@@ -92,31 +92,29 @@ describe OpenProject::GithubIntegration do
     end
 
     it "should handle the pull_request close payload" do
-      params = ActionController::Parameters.new({
-        'webhook' => {
-          'action' => 'closed',
-          'number' => '5',
-          'pull_request' => {
-            'title' => 'Bugfixes',
-            'body' => "Fixes http://example.net/wp/#{wp1.id} and " +
-                      "https://example.net/work_packages/#{wp2.id} and " +
-                      "http://example.net/subdir/wp/#{wp3.id} and " +
-                      "https://example.net/subdir/work_packages/#{wp4.id}.",
-            'html_url' => 'http://pull.request',
-            'base' => {
-              'repo' => {
-                'full_name' => 'full/name',
-                'html_url' => 'http://pull.request'
-              }
+      params = ActionController::Parameters.new(
+        'action' => 'closed',
+        'number' => '5',
+        'pull_request' => {
+          'title' => 'Bugfixes',
+          'body' => "Fixes http://example.net/wp/#{wp1.id} and " +
+                    "https://example.net/work_packages/#{wp2.id} and " +
+                    "http://example.net/subdir/wp/#{wp3.id} and " +
+                    "https://example.net/subdir/work_packages/#{wp4.id}.",
+          'html_url' => 'http://pull.request',
+          'base' => {
+            'repo' => {
+              'full_name' => 'full/name',
+              'html_url' => 'http://pull.request'
             }
-          },
-          'sender' => {
-            'login' => 'github_login',
-            'html_url' => 'http://user.name'
-          },
-          'repository' => {}
-        }
-      })
+          }
+        },
+        'sender' => {
+          'login' => 'github_login',
+          'html_url' => 'http://user.name'
+        },
+        'repository' => {}
+      )
 
       environment = {
         'HTTP_X_GITHUB_EVENT' => 'pull_request',
@@ -125,6 +123,8 @@ describe OpenProject::GithubIntegration do
 
       journal_count = wps.map { |wp| wp.journals.count }
       OpenProject::GithubIntegration::HookHandler.new.process('github', environment, params, user)
+
+      [wp1,wp2,wp3,wp4].map { |x| x.reload }
 
       expect(wp1.journals.count).to eq(journal_count[0] + 1)
       expect(wp2.journals.count).to eq(journal_count[1] + 1)
@@ -135,32 +135,30 @@ describe OpenProject::GithubIntegration do
     end
 
     it "should handle the pull_request merged payload" do
-      params = ActionController::Parameters.new({
-        'webhook' => {
-          'action' => 'closed',
-          'number' => '5',
-          'pull_request' => {
-            'title' => 'Bugfixes',
-            'body' => "Fixes http://example.net/wp/#{wp1.id} and " +
-                      "https://example.net/work_packages/#{wp2.id} and " +
-                      "http://example.net/subdir/wp/#{wp3.id} and " +
-                      "https://example.net/subdir/work_packages/#{wp4.id}.",
-            'html_url' => 'http://pull.request',
-            'base' => {
-              'repo' => {
-                'full_name' => 'full/name',
-                'html_url' => 'http://pull.request'
-              }
-            },
-            'merged' => true
+      params = ActionController::Parameters.new(
+        'action' => 'closed',
+        'number' => '5',
+        'pull_request' => {
+          'title' => 'Bugfixes',
+          'body' => "Fixes http://example.net/wp/#{wp1.id} and " +
+                    "https://example.net/work_packages/#{wp2.id} and " +
+                    "http://example.net/subdir/wp/#{wp3.id} and " +
+                    "https://example.net/subdir/work_packages/#{wp4.id}.",
+          'html_url' => 'http://pull.request',
+          'base' => {
+            'repo' => {
+              'full_name' => 'full/name',
+              'html_url' => 'http://pull.request'
+            }
           },
-          'sender' => {
-            'login' => 'github_login',
-            'html_url' => 'http://user.name'
-          },
-          'repository' => {}
-        }
-      })
+          'merged' => true
+        },
+        'sender' => {
+          'login' => 'github_login',
+          'html_url' => 'http://user.name'
+        },
+        'repository' => {}
+      )
 
       environment = {
         'HTTP_X_GITHUB_EVENT' => 'pull_request',
@@ -169,6 +167,8 @@ describe OpenProject::GithubIntegration do
 
       journal_count = wps.map { |wp| wp.journals.count }
       OpenProject::GithubIntegration::HookHandler.new.process('github', environment, params, user)
+
+      [wp1,wp2,wp3,wp4].map { |x| x.reload }
 
       expect(wp1.journals.count).to equal(journal_count[0] + 1)
       expect(wp2.journals.count).to equal(journal_count[1] + 1)
@@ -179,35 +179,33 @@ describe OpenProject::GithubIntegration do
     end
 
     it "should handle the pull_request comment creation payload" do
-      params = ActionController::Parameters.new({
-        'webhook' => {
-          'action' => 'created',
-          'issue' => {
-            'title' => 'Bugfixes',
-            'number' => '5',
-            'pull_request' => {
-              'html_url' => 'http://pull.request'
-            }
-          },
-          'comment' => {
-            'body' => "Fixes http://example.net/wp/#{wp1.id} and " +
-                      "https://example.net/work_packages/#{wp2.id} and " +
-                      "http://example.net/subdir/wp/#{wp3.id} and " +
-                      "https://example.net/subdir/work_packages/#{wp4.id}.",
-            'html_url' => 'http://comment.url',
-            'user' => {
-              'login' => 'github_login',
-              'html_url' => 'http://user.name'
-            }
-          },
-          'sender' => {
-          },
-          'repository' => {
-            'full_name' => 'full/name',
+      params = ActionController::Parameters.new(
+        'action' => 'created',
+        'issue' => {
+          'title' => 'Bugfixes',
+          'number' => '5',
+          'pull_request' => {
             'html_url' => 'http://pull.request'
           }
+        },
+        'comment' => {
+          'body' => "Fixes http://example.net/wp/#{wp1.id} and " +
+                    "https://example.net/work_packages/#{wp2.id} and " +
+                    "http://example.net/subdir/wp/#{wp3.id} and " +
+                    "https://example.net/subdir/work_packages/#{wp4.id}.",
+          'html_url' => 'http://comment.url',
+          'user' => {
+            'login' => 'github_login',
+            'html_url' => 'http://user.name'
+          }
+        },
+        'sender' => {
+        },
+        'repository' => {
+          'full_name' => 'full/name',
+          'html_url' => 'http://pull.request'
         }
-      })
+      )
 
       environment = {
         'HTTP_X_GITHUB_EVENT' => 'issue_comment',
@@ -216,6 +214,8 @@ describe OpenProject::GithubIntegration do
 
       journal_count = wps.map { |wp| wp.journals.count }
       OpenProject::GithubIntegration::HookHandler.new.process('github', environment, params, user)
+
+      [wp1,wp2,wp3,wp4].map { |x| x.reload }
 
       expect(wp1.journals.count).to equal(journal_count[0] + 1)
       expect(wp2.journals.count).to equal(journal_count[1] + 1)

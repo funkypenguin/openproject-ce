@@ -26,26 +26,6 @@
 // See doc/COPYRIGHT.rdoc for more details.
 // ++
 
-export class WorkPackageTableBaseState<T> {
-
-  /**
-   * Extract the current value from this state and pass it through the comparer function.
-   */
-  public get extractedCompareValue():any {
-    return this.current && this.comparerFunction()(this.current);
-  }
-
-  public get currentQueryValue():any {
-    return this.current;
-  }
-
-  /**
-   * Returns a comparer function for this state's value used to compare state values,
-   * e.g., as a distinctUntilChanged() key function.
-   */
-  public comparerFunction():(current:T) => any {
-    return (current: T) => current;
-  }
-
+export abstract class WorkPackageTableBaseState<T> {
   public current:T;
 }

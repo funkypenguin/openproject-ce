@@ -31,14 +31,17 @@ import {WorkPackageTableHierarchiesService} from '../../wp-fast-table/state/wp-t
 import {WorkPackageTableSumService} from '../../wp-fast-table/state/wp-table-sum.service';
 import {WorkPackageTableGroupByService} from '../../wp-fast-table/state/wp-table-group-by.service';
 import {WorkPackagesListService} from '../../wp-list/wp-list.service';
-import {WorkPackageEditModeStateService} from "../../wp-edit/wp-edit-mode-state.service";
+import {QueryResource} from '../../api/api-v3/hal-resources/query-resource.service';
+import {QueryFormResource} from '../../api/api-v3/hal-resources/query-form-resource.service';
 
 import {States} from '../../states.service';
+import {WorkPackageTableTimelineService} from '../../wp-fast-table/state/wp-table-timeline.service';
 
 interface IMyScope extends ng.IScope {
   displaySumsLabel:string;
   displayHierarchies:boolean;
   displaySums:boolean;
+  loading:boolean;
   saveQuery:Function;
   deleteQuery:Function;
 
@@ -61,8 +64,6 @@ interface IMyScope extends ng.IScope {
 
 function SettingsDropdownMenuController($scope:IMyScope,
                                         $window:ng.IWindowService,
-                                        $state:ng.ui.IStateService,
-                                        $timeout:ng.ITimeoutService,
                                         I18n:op.I18n,
                                         columnsModal:any,
                                         exportModal:any,
@@ -71,15 +72,19 @@ function SettingsDropdownMenuController($scope:IMyScope,
                                         shareModal:any,
                                         sortingModal:any,
                                         groupingModal:any,
+                                        timelinesModal:any,
                                         contextMenu:ContextMenuService,
                                         wpTableHierarchies:WorkPackageTableHierarchiesService,
                                         wpTableSum:WorkPackageTableSumService,
                                         wpTableGroupBy:WorkPackageTableGroupByService,
+                                        wpTableTimeline:WorkPackageTableTimelineService,
                                         wpListService:WorkPackagesListService,
-                                        wpEditModeState: WorkPackageEditModeStateService,
                                         states:States,
                                         AuthorisationService:any,
                                         NotificationsService:any) {
+
+  let query:QueryResource;
+  let form:QueryFormResource;
 
   $scope.text = {
     group_by_title: () => {
@@ -95,34 +100,46 @@ function SettingsDropdownMenuController($scope:IMyScope,
       } else {
         return I18n.t('js.work_packages.query.group_by');
       }
-    }
+    },
+    loading: I18n.t('js.label_loading')
   };
 
-  $scope.displayHierarchies = wpTableHierarchies.isEnabled;
-  $scope.displaySums = wpTableSum.isEnabled;
-  $scope.isGrouped = wpTableGroupBy.isEnabled;
+  states
+    .query
+    .resource
+    .values$()
+    .takeUntil(states.table.stopAllSubscriptions)
+    .subscribe(queryUpdate => {
 
-  $scope.displaySumsLabel = $scope.displaySums ? I18n.t('js.toolbar.settings.hide_sums')
-                                               : I18n.t('js.toolbar.settings.display_sums');
+    $scope.loading = true;
 
-  let form = states.table.form.value!;
-  let query = states.table.query.value!;
+    query = queryUpdate;
+  });
 
-  if (query.results && query.results.customFields) {
-    $scope.queryCustomFields = query.results.customFields;
-  }
+  states
+    .query
+    .form
+    .values$()
+    .takeUntil(states.table.stopAllSubscriptions)
+    .subscribe(formUpdate => {
 
-  if (wpEditModeState.form && wpEditModeState.form.workPackage) {
-    if (wpEditModeState.form.inEditMode) {
-      wpEditModeState.form.workPackage.getForm().then(
-        (loadedForm:any) => {
-          $scope.configureFormLink = loadedForm.configureForm;
-        }
-      );
-    } else {
-      $scope.configureFormLink = wpEditModeState.form.workPackage.configureForm;
+    form = formUpdate;
+
+    $scope.timelinesVisible = wpTableTimeline.isVisible;
+    $scope.displayHierarchies = wpTableHierarchies.isEnabled;
+    $scope.displaySums = wpTableSum.isEnabled;
+    $scope.isGrouped = wpTableGroupBy.isEnabled;
+
+    $scope.displaySumsLabel = $scope.displaySums ? I18n.t('js.toolbar.settings.hide_sums')
+                                                 : I18n.t('js.toolbar.settings.display_sums');
+
+
+    if (query.results && query.results.customFields) {
+      $scope.queryCustomFields = query.results.customFields;
     }
-  }
+
+    $scope.loading = false;
+  });
 
   $scope.saveQuery = function (event:JQueryEventObject) {
     event.stopPropagation();
@@ -188,10 +205,6 @@ function SettingsDropdownMenuController($scope:IMyScope,
   };
 
   $scope.showGroupingModal = function (event:JQueryEventObject) {
-    if ($scope.displayHierarchies) {
-      return;
-    }
-
     event.stopPropagation();
     showModal.call(groupingModal);
     updateFocusInModal('selected_columns_new');
@@ -204,10 +217,6 @@ function SettingsDropdownMenuController($scope:IMyScope,
   };
 
   $scope.toggleHierarchies = function () {
-    if (!!$scope.isGrouped) {
-      return;
-    }
-
     const isEnabled = wpTableHierarchies.isEnabled;
     wpTableHierarchies.setEnabled(!isEnabled);
   };
@@ -240,6 +249,11 @@ function SettingsDropdownMenuController($scope:IMyScope,
 
   $scope.saveQueryInvalid = function () {
     return AuthorisationService.cannot('query', 'updateImmediately');
+  };
+
+  $scope.showTimelinesModal = function (event:JQueryEventObject) {
+    event.stopPropagation();
+    showModal.call(timelinesModal);
   };
 
   function showModal(this:any) {

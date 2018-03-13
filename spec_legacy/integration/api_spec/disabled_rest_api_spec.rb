@@ -27,7 +27,7 @@
 # See doc/COPYRIGHT.rdoc for more details.
 #++
 
-require 'legacy_spec_helper'
+require_relative '../../legacy_spec_helper'
 
 describe 'ApiTest: DisabledRestApiTest', type: :request do
   fixtures :all
@@ -47,7 +47,7 @@ describe 'ApiTest: DisabledRestApiTest', type: :request do
       context 'with a valid api token' do
         before do
           @user = FactoryGirl.create(:user)
-          @token = FactoryGirl.create(:token, user: @user, action: 'api')
+          @token = FactoryGirl.create(:api_token, user: @user)
           get "/api/v2/projects.xml?key=#{@token.value}"
         end
 
@@ -62,7 +62,7 @@ describe 'ApiTest: DisabledRestApiTest', type: :request do
         before do
           @user = FactoryGirl.create(:user, password: 'adminADMIN!', password_confirmation: 'adminADMIN!')
           @authorization = ActionController::HttpAuthentication::Basic.encode_credentials(@user.login, 'adminADMIN!')
-          get '/api/v2/projects.xml', nil, authorization: @authorization
+          get '/api/v2/projects.xml', params: { authorization: @authorization }
         end
 
         it { is_expected.to respond_with :unauthorized }
@@ -75,9 +75,9 @@ describe 'ApiTest: DisabledRestApiTest', type: :request do
       context 'with a valid HTTP authentication using the API token' do
         before do
           @user = FactoryGirl.create(:user)
-          @token = FactoryGirl.create(:token, user: @user, action: 'api')
+          @token = FactoryGirl.create(:api_token, user: @user)
           @authorization = ActionController::HttpAuthentication::Basic.encode_credentials(@token.value, 'X')
-          get '/api/v2/projects.xml', nil, authorization: @authorization
+          get '/api/v2/projects.xml', params: { authorization: @authorization }
         end
 
         it { is_expected.to respond_with :unauthorized }
@@ -92,7 +92,7 @@ describe 'ApiTest: DisabledRestApiTest', type: :request do
       context 'with a valid api token' do
         before do
           @user = FactoryGirl.create(:user)
-          @token = FactoryGirl.create(:token, user: @user, action: 'api')
+          @token = FactoryGirl.create(:api_token, user: @user)
           get "/api/v2/projects.json?key=#{@token.value}"
         end
 
@@ -107,7 +107,7 @@ describe 'ApiTest: DisabledRestApiTest', type: :request do
         before do
           @user = FactoryGirl.create(:user, password: 'adminADMIN!', password_confirmation: 'adminADMIN!')
           @authorization = ActionController::HttpAuthentication::Basic.encode_credentials(@user.login, 'adminADMIN!')
-          get '/api/v2/projects.json', nil, authorization: @authorization
+          get '/api/v2/projects.json', params: { authorization: @authorization }
         end
 
         it { is_expected.to respond_with :unauthorized }
@@ -120,9 +120,9 @@ describe 'ApiTest: DisabledRestApiTest', type: :request do
       context 'with a valid HTTP authentication using the API token' do
         before do
           @user = FactoryGirl.create(:user)
-          @token = FactoryGirl.create(:token, user: @user, action: 'api')
+          @token = FactoryGirl.create(:api_token, user: @user)
           @authorization = ActionController::HttpAuthentication::Basic.encode_credentials(@token.value, 'DoesNotMatter')
-          get '/api/v2/projects.json', nil, authorization: @authorization
+          get '/api/v2/projects.json', params: { authorization: @authorization }
         end
 
         it { is_expected.to respond_with :unauthorized }

@@ -29,18 +29,17 @@
 import {DisplayField} from 'core-components/wp-display/wp-display-field/wp-display-field.module';
 import {WorkPackageCacheService} from 'core-components/work-packages/work-package-cache.service';
 import {HalResource} from 'core-components/api/api-v3/hal-resources/hal-resource.service';
-import {WorkPackageResource} from 'core-components/api/api-v3/hal-resources/work-package-resource.service';
-
+import {WorkPackageResourceInterface} from 'core-components/api/api-v3/hal-resources/work-package-resource.service';
 
 interface ICostsByType {
-  $source: {
-    _links: {
-      costType: {
-        title: string;
-      }
-    }
+  costObjectId:string;
+  costType:{
+    name:string;
   };
-  spentUnits: number;
+  staticPath:{
+    href:string;
+  };
+  spentUnits:number;
 }
 
 export class CostsByTypeDisplayField extends DisplayField {
@@ -62,21 +61,38 @@ export class CostsByTypeDisplayField extends DisplayField {
       this.value.$load().then(() => {
 
         if (this.resource.$source._type === 'WorkPackage') {
-          this.wpCacheService.updateWorkPackage(<WorkPackageResource> this.resource);
+          this.wpCacheService.updateWorkPackage(<WorkPackageResourceInterface> this.resource);
         }
       });
     }
   }
 
-  public get valueString() {
-    return  _.map(this.value.elements, (val: ICostsByType) => {
-      return val.spentUnits + ' ' + val.$source._links.costType.title;
-    }).join(', ');
-  };
+  public render(element:HTMLElement, displayText:string):void {
+    const showCosts = this.resource.showCosts;
+    if (this.isEmpty() || !showCosts) {
+      element.textContent = this.placeholder;
+      return;
+    }
 
-  public isEmpty(): boolean {
+    this.value.elements.forEach((val:ICostsByType, i:number) => {
+      const link = document.createElement('a');
+      link.href = showCosts.href + '?cost_type_id=' + val.costObjectId;
+      link.setAttribute('target', '_blank');
+      link.textContent = val.spentUnits + ' ' + val.costType.name;
+      element.appendChild(link);
+
+      if (i < this.value.elements.length - 1) {
+        const sep = document.createElement('span');
+        sep.textContent = ', ';
+
+        element.appendChild(sep);
+      }
+    });
+  }
+
+  public isEmpty():boolean {
     return !this.value ||
-           !this.value.elements ||
-           this.value.elements.length === 0;
+      !this.value.elements ||
+      this.value.elements.length === 0;
   }
 }
